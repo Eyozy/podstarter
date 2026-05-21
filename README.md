@@ -25,8 +25,8 @@
 ### 第一步：克隆项目
 
 ```bash
-git clone https://github.com/Eyozy/astro-podcast-starter.git
-cd astro-podcast-starter
+git clone https://github.com/Eyozy/podstarter.git
+cd podstarter
 ```
 
 ### 第二步：安装依赖
