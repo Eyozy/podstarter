@@ -3,6 +3,8 @@ import MainLayout from "../../layouts/MainLayout.astro";
 import episodes from "../../data/episodes.json";
 import { getEntry } from "astro:content";
 import DOMPurify from "isomorphic-dompurify";
+import fs from "node:fs";
+import path from "node:path";
 // 详情页文案在 site.json 的 pages.episodeDetail 中配置。
 import site from "../../data/site.json";
 
@@ -35,11 +37,29 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
 // Try to get transcript
 let transcript;
 let TranscriptContent;
+let isTranscriptPlaceholder = false;
 try {
   transcript = await getEntry("transcripts", episode.id);
   if (transcript) {
     const rendered = await transcript.render();
     TranscriptContent = rendered.Content;
+
+    // Astro 5 Content Layer may not expose transcript.body directly, so we read from the markdown file directly
+    let rawMarkdown = "";
+    try {
+      const transcriptFilePath = path.join(process.cwd(), "src/content/transcripts", `${episode.id}.md`);
+      if (fs.existsSync(transcriptFilePath)) {
+        rawMarkdown = fs.readFileSync(transcriptFilePath, "utf-8");
+      }
+    } catch (err) {
+      console.log(`Failed to read raw transcript file for ${episode.id}:`, err);
+    }
+
+    // 判断是否是占位符
+    isTranscriptPlaceholder =
+      rawMarkdown.includes("暂未提供文字稿") ||
+      rawMarkdown.includes("通义听悟") ||
+      rawMarkdown.includes("NotebookLM");
   }
 } catch (e) {
   console.log(`No transcript found for episode ${episode.id}`);
@@ -59,7 +79,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
 <MainLayout title={episode.title}>
   <article class="max-w-6xl mx-auto w-full" data-episode-page>
     <!-- Breadcrumbs -->
-    <nav class="mb-8 md:mb-12 font-serif text-sm opacity-50">
+    <nav class="mb-6 sm:mb-8 md:mb-12 font-serif text-xs sm:text-sm opacity-50 break-words">
       <a href="/episodes" class="hover:text-orange-800 transition-colors"
         >{site.pages.episodeDetail.breadcrumbListLabel}</a
       >
@@ -68,7 +88,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     </nav>
 
     <!-- Header Section -->
-    <header class="flex flex-col md:flex-row md:items-stretch gap-6 md:gap-8 lg:gap-12 mb-12 md:mb-20">
+    <header class="flex flex-col md:flex-row md:items-stretch gap-5 sm:gap-6 md:gap-8 lg:gap-12 mb-10 sm:mb-12 md:mb-20">
       <!-- 封面图：移动端隐藏，桌面端显示固定 1:1 比例 -->
       <div
         class="hidden md:block w-60 lg:w-72 shrink-0 shadow-2xl border border-[#2d2a26]/5 overflow-hidden bg-[#f0ede8] rounded-2xl md:aspect-square self-start md:self-stretch"
@@ -82,7 +102,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
       </div>
 
       <div
-        class="md:hidden w-[clamp(140px,45vw,220px)] mx-auto shadow-lg border border-[#2d2a26]/5 overflow-hidden bg-[#f0ede8] rounded-2xl aspect-square"
+        class="md:hidden w-[clamp(132px,45vw,220px)] mx-auto shadow-lg border border-[#2d2a26]/5 overflow-hidden bg-[#f0ede8] rounded-2xl aspect-square"
       >
         <img
           src={coverImage}
@@ -96,7 +116,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
         data-fit-content
       >
         <div>
-          <div class="flex items-center gap-3 mb-4">
+          <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 mb-4">
             <span
               class="text-[10px] font-serif font-bold uppercase tracking-widest text-orange-700 bg-orange-50 px-3 py-1 rounded-md"
             >
@@ -106,7 +126,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
           </div>
 
           <h1
-            class="text-2xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight tracking-tight"
+            class="text-[1.75rem] sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight tracking-tight"
             data-fit-title
             data-min-scale="0.55"
             data-min-font="16"
@@ -172,7 +192,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
 
           <div class="flex flex-wrap items-center gap-4">
             <button
-              class="play-button flex items-center gap-2.5 px-6 py-3 bg-[#2d2a26] text-white font-serif text-xs font-bold uppercase tracking-widest hover:bg-orange-800 transition-all rounded-lg shadow-lg transform hover:-translate-y-0.5 active:translate-y-0"
+            class="play-button flex items-center gap-2.5 px-5 sm:px-6 py-3 bg-[#2d2a26] text-white font-serif text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] hover:bg-orange-800 transition-all rounded-lg shadow-lg transform hover:-translate-y-0.5 active:translate-y-0"
               data-title={episode.title}
               data-audio={episode.enclosure?.url}
               data-cover={coverImage}
@@ -192,8 +212,17 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
               TranscriptContent && (
                 <button
                   id="download-md"
-                  class="flex items-center gap-2.5 px-6 py-3 border border-[#2d2a26]/10 font-serif text-xs font-bold uppercase tracking-widest hover:bg-[#2d2a26]/5 transition-all cursor-pointer rounded-lg shadow-sm"
-                  title={site.pages.episodeDetail.downloadTranscriptTitle}
+                  class={`flex items-center gap-2.5 px-5 sm:px-6 py-3 border font-serif text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] transition-all rounded-lg shadow-sm ${
+                    isTranscriptPlaceholder
+                      ? "border-gray-200 text-gray-400 bg-gray-100/50 opacity-60 cursor-not-allowed"
+                      : "border-[#2d2a26]/10 text-[#2d2a26] hover:bg-[#2d2a26]/5 cursor-pointer"
+                  }`}
+                  title={
+                    isTranscriptPlaceholder
+                      ? "文字稿正在转化中，暂不可下载"
+                      : site.pages.episodeDetail.downloadTranscriptTitle
+                  }
+                  disabled={isTranscriptPlaceholder}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -220,29 +249,37 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
 
     <!-- Content Section -->
     <section
-      class="prose prose-orange max-w-none prose-headings:font-serif prose-p:font-serif prose-p:leading-relaxed prose-p:text-[#2d2a26]/80 bg-white p-8 md:p-12 lg:p-16 border border-[#2d2a26]/5 shadow-sm rounded-2xl"
+      class="prose prose-orange max-w-none prose-headings:font-serif prose-p:font-serif prose-p:leading-relaxed prose-p:text-[#2d2a26]/80 bg-white p-5 sm:p-6 md:p-10 lg:p-14 border border-[#2d2a26]/5 shadow-sm rounded-2xl"
     >
       <!-- Tabs Navigation -->
       <div
-        class="flex items-center gap-8 border-b border-[#2d2a26]/10 mb-10 pb-4"
+        class="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[#2d2a26]/10 mb-8 sm:mb-10 pb-4"
       >
         <button
-          class="tab-btn active text-lg font-bold font-serif transition-colors text-orange-700 opacity-100"
+          class="tab-btn active text-base sm:text-lg font-bold font-serif transition-colors text-orange-700 opacity-100"
           type="button"
           data-target="info"
         >
           {site.pages.episodeDetail.infoTabLabel}
         </button>
         <button
-          class={`tab-btn text-lg font-bold font-serif transition-all ${!TranscriptContent ? "opacity-30 cursor-not-allowed" : "opacity-40 hover:opacity-100 hover:text-orange-700"}`}
+          class={`tab-btn text-base sm:text-lg font-bold font-serif transition-all ${
+            !TranscriptContent || isTranscriptPlaceholder
+              ? "opacity-30 cursor-not-allowed"
+              : "opacity-40 hover:opacity-100 hover:text-orange-700"
+          }`}
           type="button"
           data-target="transcript"
-          disabled={!TranscriptContent}
-          title={!TranscriptContent ? site.pages.episodeDetail.transcriptEmptyTitle : ""}
+          disabled={!TranscriptContent || isTranscriptPlaceholder}
+          title={
+            !TranscriptContent || isTranscriptPlaceholder
+              ? site.pages.episodeDetail.transcriptEmptyTitle
+              : ""
+          }
         >
           {site.pages.episodeDetail.transcriptTabLabel}
           {
-            TranscriptContent && (
+            TranscriptContent && !isTranscriptPlaceholder && (
               <span class="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-serif font-bold tracking-wider">
                 {site.pages.episodeDetail.transcriptNewBadgeLabel}
               </span>
@@ -271,7 +308,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
             class="tab-panel hidden opacity-0 transition-opacity duration-300 ease-in-out"
           >
             {transcript?.data.contributors && (
-              <div class="mb-8 p-4 bg-[#f9f8f6] rounded-lg border border-[#2d2a26]/5">
+              <div class="mb-6 sm:mb-8 p-4 bg-[#f9f8f6] rounded-lg border border-[#2d2a26]/5">
                 <span class="text-xs font-bold uppercase tracking-widest opacity-50 block mb-2">
                   {site.pages.episodeDetail.transcriptContributorsLabel}
                 </span>
@@ -396,24 +433,19 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
       area.innerHTML = processedContent;
       area.dataset.processed = "true";
     });
+  }
 
-    const body = document.body;
-    if (!body) return;
-    if (body.dataset.timestampBound) return;
-    body.dataset.timestampBound = "true";
-
+  // timestamp-link 点击委托：模块级单例，只注册一次
+  if (!window.__timestampListenerBound) {
+    window.__timestampListenerBound = true;
     document.addEventListener("click", (e) => {
       const target = e.target.closest(".timestamp-link");
       if (!target) return;
       const seconds = Number(target.dataset.seconds);
       if (!Number.isFinite(seconds)) return;
-      const audioUrl = decodeURIComponent(
-        target.dataset.audio || "",
-      );
+      const audioUrl = decodeURIComponent(target.dataset.audio || "");
       if (!audioUrl) return;
-      const cover = decodeURIComponent(
-        target.dataset.cover || "",
-      );
+      const cover = decodeURIComponent(target.dataset.cover || "");
 
       if (typeof window.seekToTimestamp === "function") {
         window.seekToTimestamp(seconds, audioUrl, "", cover);
@@ -425,6 +457,23 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     const downloadBtn = document.getElementById("download-md");
     if (!downloadBtn || !window.episodeData?.transcript) return;
 
+    // 客户端双重保障：检测文字稿正文是否包含占位符关键字
+    const isPlaceholder = () => {
+      const bodyText = window.episodeData.transcript.body || "";
+      return (
+        bodyText.includes("暂未提供文字稿") ||
+        bodyText.includes("通义听悟") ||
+        bodyText.includes("NotebookLM")
+      );
+    };
+
+    if (isPlaceholder()) {
+      downloadBtn.setAttribute("disabled", "true");
+      downloadBtn.classList.add("border-gray-200", "text-gray-400", "bg-gray-100/50", "opacity-60", "cursor-not-allowed");
+      downloadBtn.classList.remove("border-[#2d2a26]/10", "text-[#2d2a26]", "hover:bg-[#2d2a26]/5", "cursor-pointer");
+      downloadBtn.title = "文字稿正在转化中，暂不可下载";
+    }
+
     const buildMarkdown = () => {
       const { episode, formattedDate, transcript } = window.episodeData;
       let mdContent = `# ${episode.title}\n\n`;
@@ -435,7 +484,11 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
       return mdContent;
     };
 
-    downloadBtn.addEventListener("click", () => {
+    downloadBtn.addEventListener("click", (e) => {
+      if (downloadBtn.hasAttribute("disabled") || isPlaceholder()) {
+        e.preventDefault();
+        return;
+      }
       const blob = new Blob([buildMarkdown()], { type: "text/markdown" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

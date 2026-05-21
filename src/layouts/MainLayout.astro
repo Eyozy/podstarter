@@ -67,11 +67,11 @@ const filteredNavigation = aiEnabled
       class="border-b border-[#2d2a26]/10 bg-white/50 backdrop-blur-md sticky top-0 z-40"
     >
       <nav
-        class="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 flex justify-between items-center"
+        class="max-w-6xl mx-auto px-4 sm:px-5 md:px-6 py-4 md:py-6 flex justify-between items-center gap-4"
       >
         <a
           href="/"
-          class="text-xl md:text-2xl font-bold tracking-tighter hover:text-orange-800 transition-colors"
+          class="text-lg sm:text-xl md:text-2xl font-bold tracking-tighter hover:text-orange-800 transition-colors min-w-0"
           >{brand.name}</a
         >
 
@@ -121,6 +121,7 @@ const filteredNavigation = aiEnabled
       id="mobile-menu"
       class="fixed inset-0 z-50 md:hidden opacity-0 pointer-events-none transition-opacity duration-200 overflow-hidden"
       aria-hidden="true"
+      inert
     >
       <!-- 背景遮罩 -->
       <div
@@ -132,7 +133,7 @@ const filteredNavigation = aiEnabled
       <!-- 菜单主体 -->
       <div
         id="mobile-menu-panel"
-        class="absolute top-0 right-0 h-full w-72 max-w-[80vw] bg-[#f5f2ed] shadow-2xl translate-x-full transition-transform duration-200"
+        class="absolute top-0 right-0 h-full w-72 max-w-[86vw] bg-[#f5f2ed] shadow-2xl translate-x-full transition-transform duration-200"
       >
         <!-- 关闭按钮 -->
         <div class="flex justify-end p-4 border-b border-[#2d2a26]/10">
@@ -186,23 +187,23 @@ const filteredNavigation = aiEnabled
       </div>
     </div>
 
-    <main class="grow max-w-6xl mx-auto px-4 md:px-6 py-8 md:py-16 w-full">
+    <main class="grow max-w-6xl mx-auto px-4 sm:px-5 md:px-6 py-8 md:py-16 w-full">
       <slot />
     </main>
 
-    <footer class="border-t border-[#2d2a26]/10 py-16 bg-white/50">
-      <div class="max-w-6xl mx-auto px-6">
+    <footer class="border-t border-[#2d2a26]/10 py-10 md:py-12 bg-white/50">
+      <div class="max-w-6xl mx-auto px-4 sm:px-5 md:px-6">
         <div
-          class="flex flex-col md:flex-row justify-between items-center md:items-end text-center md:text-left gap-8"
+          class="flex flex-col md:flex-row justify-between items-center md:items-end text-center md:text-left gap-4 md:gap-6"
         >
           <div>
-            <h3 class="text-xl font-bold mb-4">{brand.name}</h3>
-            <p class="opacity-50 text-sm font-serif max-w-md leading-relaxed">
+            <h3 class="text-lg md:text-xl font-bold mb-2.5">{brand.name}</h3>
+            <p class="text-[#6e665d] text-sm font-serif max-w-md leading-relaxed">
               {footer.descriptionLine1}<br />{footer.descriptionLine2}
             </p>
           </div>
-          <div class="flex flex-col md:items-end gap-2">
-            <p class="opacity-30 text-[10px] font-serif">
+          <div class="flex flex-col md:items-end gap-1">
+            <p class="text-[#766f67] text-[10px] font-serif leading-relaxed">
               &copy; {brand.establishedYear} - {new Date().getFullYear()} {brand.name}. All rights reserved.
             </p>
           </div>
@@ -212,7 +213,7 @@ const filteredNavigation = aiEnabled
 
     <button
       id="back-to-top"
-      class="fixed bottom-24 sm:bottom-28 right-4 sm:right-8 z-40 w-10 h-10 sm:w-12 sm:h-12 bg-white text-[#2d2a26] rounded-full shadow-lg border border-[#2d2a26]/10 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300 hover:bg-orange-50 hover:scale-110 active:scale-95 hover:shadow-xl translate-y-4 data-[visible=true]:opacity-100 data-[visible=true]:pointer-events-auto data-[visible=true]:translate-y-0"
+      class="fixed bottom-24 sm:bottom-28 right-2 sm:right-6 md:right-8 z-40 w-10 h-10 sm:w-12 sm:h-12 bg-white text-[#2d2a26] rounded-full shadow-lg border border-[#2d2a26]/10 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300 hover:bg-orange-50 hover:scale-110 active:scale-95 hover:shadow-xl translate-y-4 data-[visible=true]:opacity-100 data-[visible=true]:pointer-events-auto data-[visible=true]:translate-y-0"
       aria-label={site.ui.backToTopLabel}
     >
       <svg
@@ -231,79 +232,90 @@ const filteredNavigation = aiEnabled
     </button>
 
     <script>
-      function initBackToTop() {
+      // 1. Back To Top Visibility Toggle (Global Scroll Listener - Registered Once)
+      const toggleBackToTopBtn = () => {
         const btn = document.getElementById("back-to-top");
-        if (!btn) return;
-
-        // 滚动一定距离后显示按钮
-        const toggleBtn = () => {
+        if (btn) {
           btn.dataset.visible = window.scrollY > 300 ? "true" : "false";
-        };
-
-        if (!btn.dataset.bound) {
-          // 避免路由切换重复绑定事件
-          window.addEventListener("scroll", toggleBtn, { passive: true });
-          btn.addEventListener("click", () => {
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          });
-          btn.dataset.bound = "true";
         }
+      };
 
-        toggleBtn();
-      }
-
-      function initMobileMenu() {
+      // 2. Mobile Menu Controller
+      const setMobileMenuOpen = (open: boolean) => {
         const btn = document.getElementById("mobile-menu-btn");
         const menu = document.getElementById("mobile-menu");
         const panel = document.getElementById("mobile-menu-panel");
-        const closeBtn = document.getElementById("mobile-menu-close");
-        const overlay = document.getElementById("mobile-menu-overlay");
         if (!btn || !menu || !panel) return;
 
-        const setMenuOpen = (open: boolean) => {
-          menu.classList.toggle("opacity-0", !open);
-          menu.classList.toggle("pointer-events-none", !open);
-          menu.classList.toggle("opacity-100", open);
-          menu.classList.toggle("pointer-events-auto", open);
-          panel.classList.toggle("translate-x-full", !open);
-          panel.classList.toggle("translate-x-0", open);
-          document.body.style.overflow = open ? "hidden" : "";
-          btn.setAttribute("aria-expanded", String(open));
-          menu.setAttribute("aria-hidden", String(!open));
-        };
+        menu.classList.toggle("opacity-0", !open);
+        menu.classList.toggle("pointer-events-none", !open);
+        menu.classList.toggle("opacity-100", open);
+        menu.classList.toggle("pointer-events-auto", open);
+        panel.classList.toggle("translate-x-full", !open);
+        panel.classList.toggle("translate-x-0", open);
+        document.body.style.overflow = open ? "hidden" : "";
+        btn.setAttribute("aria-expanded", String(open));
+        menu.setAttribute("aria-hidden", String(!open));
+        menu.toggleAttribute("inert", !open);
+      };
 
-        if (!menu.dataset.bound) {
-          // 避免路由切换重复绑定事件
-          btn.addEventListener("click", () => setMenuOpen(true));
-          closeBtn?.addEventListener("click", () => setMenuOpen(false));
-          overlay?.addEventListener("click", () => setMenuOpen(false));
+      // Register Top-Level Listeners Exactly Once Globally
+      const registerGlobalListeners = () => {
+        const win = window as any;
+        if (win.__globalLayoutListenersBound) return;
+        win.__globalLayoutListenersBound = true;
 
-          // 点击菜单项后关闭菜单
-          menu.querySelectorAll(".mobile-nav-link").forEach((link) => {
-            link.addEventListener("click", () => setMenuOpen(false));
-          });
+        // Scroll listener on window
+        window.addEventListener("scroll", toggleBackToTopBtn, { passive: true });
 
-          // ESC 键关闭菜单
-          document.addEventListener("keydown", (e) => {
-            if (
-              e.key === "Escape" &&
-              !menu.classList.contains("pointer-events-none")
-            ) {
-              setMenuOpen(false);
+        // Click delegation on document
+        document.addEventListener("click", (e) => {
+          const target = e.target as HTMLElement | null;
+          if (!target) return;
+
+          // Back to top button click
+          if (target.closest("#back-to-top")) {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            return;
+          }
+
+          // Mobile menu triggers
+          if (target.closest("#mobile-menu-btn")) {
+            setMobileMenuOpen(true);
+            return;
+          }
+          if (
+            target.closest("#mobile-menu-close") || 
+            target.closest("#mobile-menu-overlay") || 
+            target.closest(".mobile-nav-link")
+          ) {
+            setMobileMenuOpen(false);
+            return;
+          }
+        });
+
+        // Keydown delegation on document (Escape closing menu)
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            const menu = document.getElementById("mobile-menu");
+            if (menu && !menu.classList.contains("pointer-events-none")) {
+              setMobileMenuOpen(false);
             }
-          });
-          menu.dataset.bound = "true";
-        }
-      }
+          }
+        });
+      };
 
+      // Run visibility checks and reset states on page load
       document.addEventListener("astro:page-load", () => {
-        initBackToTop();
-        initMobileMenu();
+        registerGlobalListeners();
+        toggleBackToTopBtn();
+        // Ensure menu is closed on transition
+        setMobileMenuOpen(false);
       });
     </script>
 
     <Player />
-    <ShareModal />
+    <ShareModal transition:persist />
   </body>
 </html>
 

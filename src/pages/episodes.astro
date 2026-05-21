@@ -21,14 +21,14 @@ const allTags = aiEnabled
 ---
 
 <MainLayout title={site.pages.episodes.title}>
-  <div class="mb-8 md:mb-12 lg:mb-20">
+  <div class="mb-8 md:mb-12 lg:mb-20 max-w-4xl">
     <h1
       class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 tracking-tight"
     >
       {site.pages.episodes.headline}
     </h1>
     <p
-      class="text-base md:text-lg opacity-60 font-serif max-w-2xl leading-relaxed"
+      class="text-base md:text-lg opacity-60 font-serif leading-relaxed max-w-3xl"
     >
       {site.pages.episodes.description}
     </p>
@@ -37,12 +37,12 @@ const allTags = aiEnabled
   <div class="flex flex-col lg:flex-row gap-6 md:gap-8 lg:gap-12 items-stretch lg:items-start">
     <!-- 筛选与搜索工具栏 -->
     <aside
-      class="w-full lg:w-64 xl:w-72 shrink-0 space-y-6 md:space-y-8 lg:space-y-10 z-10 lg:sticky lg:top-24"
+      class="w-full lg:w-64 xl:w-72 shrink-0 space-y-5 md:space-y-7 lg:space-y-10 z-10 lg:sticky lg:top-24"
     >
       <!-- 当前主题 (仅当有主题筛选时显示) -->
       <div
         id="active-theme-section"
-        class="hidden bg-orange-50 p-6 border border-orange-100 rounded-2xl relative group transition-all duration-300"
+        class="hidden bg-orange-50 p-4 sm:p-5 border border-orange-100 rounded-2xl relative group transition-all duration-300"
       >
         <h3
           class="text-[10px] font-serif font-bold uppercase tracking-[0.2em] text-orange-800/60 mb-3 flex items-center gap-2"
@@ -77,7 +77,7 @@ const allTags = aiEnabled
 
       <!-- 搜索框 -->
       <div
-        class="bg-white/50 lg:bg-transparent p-4 md:p-6 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none"
+        class="bg-white/50 lg:bg-transparent p-4 md:p-5 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none"
       >
         <h3
           class="text-[10px] font-serif font-bold uppercase tracking-[0.2em] text-orange-800/60 mb-4 md:mb-6 flex items-center gap-2"
@@ -160,7 +160,7 @@ const allTags = aiEnabled
 
       <!-- 按年份筛选 -->
       <div
-        class="bg-white/50 lg:bg-transparent p-4 md:p-6 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none lg:pt-8 lg:border-t lg:border-[#2d2a26]/5"
+        class="bg-white/50 lg:bg-transparent p-4 md:p-5 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none lg:pt-8 lg:border-t lg:border-[#2d2a26]/5"
       >
         <h3
           class="text-[10px] font-serif font-bold uppercase tracking-[0.2em] text-orange-800/60 mb-4 md:mb-6 flex items-center gap-2"
@@ -191,7 +191,7 @@ const allTags = aiEnabled
       {/* 按标签筛选 - 仅在 AI 功能开启时显示 */}
       {aiEnabled && (
       <div
-        class="bg-white/50 lg:bg-transparent p-4 md:p-6 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none lg:pt-8 lg:border-t lg:border-[#2d2a26]/5"
+        class="bg-white/50 lg:bg-transparent p-4 md:p-5 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none lg:pt-8 lg:border-t lg:border-[#2d2a26]/5"
       >
         <h3
           class="text-[10px] font-serif font-bold uppercase tracking-[0.2em] text-orange-800/60 mb-4 md:mb-6 flex items-center justify-between"
@@ -262,6 +262,7 @@ const allTags = aiEnabled
         episodes.map((episode) => (
           <div
             class="episode-item"
+            data-id={episode.id}
             data-year={new Date(episode.pubDate).getFullYear()}
             data-theme={episode.themeId}
             data-tags={JSON.stringify(episode.tags || [])}
@@ -275,7 +276,7 @@ const allTags = aiEnabled
       <!-- 无搜索结果提示 -->
       <div
         id="no-results"
-        class="hidden py-32 text-center border-2 border-dashed border-[#2d2a26]/5 rounded-2xl bg-white/20"
+        class="hidden py-20 sm:py-24 md:py-32 text-center border-2 border-dashed border-[#2d2a26]/5 rounded-2xl bg-white/20 px-6"
       >
         <p class="text-xl opacity-40 font-serif italic mb-2">
           {site.pages.episodes.emptyTitle}
@@ -292,7 +293,7 @@ const allTags = aiEnabled
   window.themesData = themes;
 </script>
 
-<script define:vars={{ toggleTagsExpandLabel: site.pages.episodes.toggleTagsExpandLabel, toggleTagsCollapseLabel: site.pages.episodes.toggleTagsCollapseLabel }}>
+<script define:vars={{ toggleTagsExpandLabel: site.pages.episodes.toggleTagsExpandLabel, toggleTagsCollapseLabel: site.pages.episodes.toggleTagsCollapseLabel, pagefindBaseUrl: `${Astro.site?.pathname || "/"}pagefind/pagefind.js`, pagefindEnabled: !import.meta.env.DEV }}>
   function initSearch() {
     const searchInput = document.getElementById("search-input");
     const searchInputEl =
@@ -325,6 +326,48 @@ const allTags = aiEnabled
       tagsExpanded: false,
     };
 
+    // 缓存所有卡片的原始文本/链接和 snippet 的 className，以防检索清除后无法复原 (KISS 经典还原模式)
+    const originalContent = new Map();
+    episodeItems.forEach((item) => {
+      if (!(item instanceof HTMLElement)) return;
+      const id = item.getAttribute("data-id");
+      if (!id) return;
+      
+      const snippetEl = item.querySelector(`[data-episode-snippet="${id}"]`);
+      const titleLinkEl = item.querySelector(`[data-card-title-link="${id}"]`);
+      originalContent.set(id, {
+        snippetHTML: snippetEl ? snippetEl.innerHTML : "",
+        titleHTML: titleLinkEl ? titleLinkEl.innerHTML : "",
+        // 缓存 line-clamp 等 className，搜索命中时移除、清除时还原
+        snippetClass: snippetEl ? snippetEl.className : "",
+      });
+    });
+
+    // 异步加载 Pagefind 引擎与降级保障
+    let pagefind = null;
+    const loadPagefind = async () => {
+      if (!pagefindEnabled) {
+        return;
+      }
+      if (window.pagefind) {
+        pagefind = window.pagefind;
+        return;
+      }
+
+      const pagefindBase = pagefindBaseUrl;
+      try {
+        // @ts-ignore
+        const pf = await import(/* @vite-ignore */ pagefindBase);
+        await pf.options({});
+        pagefind = pf;
+        window.pagefind = pf;
+        console.log("Pagefind 引擎异步加载成功，支持文字稿高亮检索");
+      } catch (e) {
+        console.warn("未检测到 Pagefind 静态索引，降级使用原生字符匹配检索:", e);
+      }
+    };
+    loadPagefind();
+
     // 样式常量
     const activeClasses = ["bg-[#2d2a26]", "text-white", "hover:text-white"];
     const inactiveClasses = [
@@ -353,7 +396,6 @@ const allTags = aiEnabled
     ];
 
     const updateTagUI = () => {
-      // 显示/隐藏清除按钮
       if (state.currentTag !== "all") {
         clearTagBtn?.classList.remove("hidden");
       } else {
@@ -381,7 +423,6 @@ const allTags = aiEnabled
           if (activeThemeSection) activeThemeSection.classList.remove("hidden");
           if (activeThemeTitle) activeThemeTitle.textContent = theme.title;
         } else {
-          // 主题ID无效时隐藏
           if (activeThemeSection) activeThemeSection.classList.add("hidden");
         }
       } else {
@@ -389,15 +430,154 @@ const allTags = aiEnabled
       }
     };
 
-    const filterEpisodes = () => {
+    // 辅助工具：高亮普通字符并添加 mark 标签
+    const highlightRawText = (text, keyword) => {
+      if (!keyword) return text;
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`(${escapedKeyword})`, "gi");
+      return text.replace(regex, "<mark>$1</mark>");
+    };
+
+    const buildManualExcerpt = (
+      text,
+      query,
+      contextBefore = 20,
+      contextAfter = 40,
+    ) => {
+      const lowerText = text.toLowerCase();
+      const lowerQuery = query.toLowerCase();
+      const queryIndex = lowerText.indexOf(lowerQuery);
+
+      if (queryIndex < 0) return highlightRawText(text, query);
+
+      const start = Math.max(0, queryIndex - contextBefore);
+      const end = Math.min(text.length, queryIndex + query.length + contextAfter);
+      let excerpt = text.slice(start, end);
+
+      if (start > 0) excerpt = `...${excerpt}`;
+      if (end < text.length) excerpt = `${excerpt}...`;
+
+      return highlightRawText(excerpt, query);
+    };
+
+    const getSearchPresentation = ({
+      query,
+      title = "",
+      snippetText = "",
+      excerptHtml = "",
+      visibleThreshold = 60,
+    }) => {
+      if (!query) {
+        return {
+          kind: "default",
+          snippetHtml: snippetText,
+          titleHtml: title,
+        };
+      }
+
+      const lowerQuery = query.toLowerCase();
+      const lowerTitle = title.toLowerCase();
+      const lowerSnippet = snippetText.toLowerCase();
+      const queryIndex = lowerSnippet.indexOf(lowerQuery);
+      const titleHtml = highlightRawText(title, query);
+
+      if (!excerptHtml) {
+        if (queryIndex >= visibleThreshold) {
+          return {
+            kind: "fallback-snippet-excerpt",
+            snippetHtml: `<span class="transcript-badge">节目介绍</span>${buildManualExcerpt(snippetText, query)}`,
+            titleHtml,
+          };
+        }
+
+        return {
+          kind: "fallback-inline",
+          snippetHtml: highlightRawText(snippetText, query),
+          titleHtml,
+        };
+      }
+
+      if (!lowerTitle.includes(lowerQuery) && !lowerSnippet.includes(lowerQuery)) {
+        return {
+          kind: "transcript-only",
+          snippetHtml: `<span class="transcript-badge">文字稿</span>${excerptHtml}`,
+          titleHtml,
+        };
+      }
+
+      if (queryIndex >= visibleThreshold) {
+        return {
+          kind: "snippet-excerpt",
+          snippetHtml: `<span class="transcript-badge">节目介绍</span>${excerptHtml}`,
+          titleHtml,
+        };
+      }
+
+      return {
+        kind: "snippet-inline",
+        snippetHtml: highlightRawText(snippetText, query),
+        titleHtml,
+      };
+    };
+
+    // 静态搜索备用函数
+    const fallbackIncludesSearch = (query, matchedIds) => {
+      episodeItems.forEach((item) => {
+        if (!(item instanceof HTMLElement)) return;
+        const id = item.getAttribute("data-id") || "";
+        const title = item.getAttribute("data-title") || "";
+        const snippet = item.getAttribute("data-snippet") || "";
+        if (title.includes(query) || snippet.includes(query)) {
+          matchedIds.add(id);
+        }
+      });
+    };
+
+    // 自增 ID 用以处理异步竞态问题
+    let currentSearchId = 0;
+
+    const filterEpisodes = async () => {
+      const searchId = ++currentSearchId;
+      const query = state.currentQuery;
       let visibleCount = 0;
+      let matchedIds = new Set();
+      let excerpts = new Map();
+
+      // 执行异步 Pagefind 检索
+      if (query !== "" && pagefind) {
+        try {
+          const search = await pagefind.search(query);
+          // 在等待异步数据完成的间隙中，如果用户已经进行了新的输入，立即舍弃旧的结果
+          if (searchId !== currentSearchId) return;
+
+          const results = await Promise.all(search.results.map((r) => r.data()));
+          if (searchId !== currentSearchId) return;
+
+          results.forEach((res) => {
+            const urlMatch = res.url.match(/\/episodes\/([^\/]+)/);
+            if (urlMatch) {
+              const id = urlMatch[1];
+              matchedIds.add(id);
+              excerpts.set(id, res.excerpt);
+            }
+          });
+        } catch (err) {
+          console.error("Pagefind 检索失败，降级使用原生包括匹配:", err);
+          fallbackIncludesSearch(query, matchedIds);
+        }
+      } else if (query !== "") {
+        // 无 Pagefind，降级
+        fallbackIncludesSearch(query, matchedIds);
+      }
+
+      // 如果有竞态输入，中断
+      if (searchId !== currentSearchId) return;
 
       episodeItems.forEach((item) => {
         if (!(item instanceof HTMLElement)) return;
+        const id = item.getAttribute("data-id") || "";
         const year = item.getAttribute("data-year");
         const theme = item.getAttribute("data-theme");
-        const title = item.getAttribute("data-title") || "";
-        const snippet = item.getAttribute("data-snippet") || "";
         const tags = JSON.parse(item.getAttribute("data-tags") || "[]");
 
         const yearMatch =
@@ -406,21 +586,59 @@ const allTags = aiEnabled
           state.currentTheme === "all" || theme === state.currentTheme;
         const tagMatch =
           state.currentTag === "all" || tags.includes(state.currentTag);
-        const queryMatch =
-          state.currentQuery === "" ||
-          title.includes(state.currentQuery) ||
-          snippet.includes(state.currentQuery);
+
+        let queryMatch = true;
+        if (query !== "") {
+          queryMatch = matchedIds.has(id);
+        }
 
         if (yearMatch && themeMatch && tagMatch && queryMatch) {
           item.style.display = "block";
           visibleCount++;
+
+          const original = originalContent.get(id);
+          const snippetEl = item.querySelector(`[data-episode-snippet="${id}"]`);
+          const titleLinkEl = item.querySelector(`[data-card-title-link="${id}"]`);
+
+          if (query !== "" && original) {
+            const presentation = getSearchPresentation({
+              query,
+              title: titleLinkEl?.textContent || "",
+              snippetText: snippetEl?.textContent || "",
+              excerptHtml: excerpts.get(id) || "",
+            });
+
+            if (snippetEl) {
+              snippetEl.innerHTML = presentation.snippetHtml;
+            }
+            if (titleLinkEl) {
+              titleLinkEl.innerHTML = presentation.titleHtml;
+            }
+          } else if (original) {
+            // 清除搜索时，还原卡片原始结构（包括无高亮文本）
+            if (snippetEl) {
+              snippetEl.innerHTML = original.snippetHTML;
+            }
+            if (titleLinkEl) titleLinkEl.innerHTML = original.titleHTML;
+          }
+
         } else {
           item.style.display = "none";
+          // 隐藏时也顺便还原高亮状态，保证状态一致
+          const original = originalContent.get(id);
+          const snippetEl = item.querySelector(`[data-episode-snippet="${id}"]`);
+          const titleLinkEl = item.querySelector(`[data-card-title-link="${id}"]`);
+          if (original) {
+            if (snippetEl) {
+              snippetEl.innerHTML = original.snippetHTML;
+            }
+            if (titleLinkEl) titleLinkEl.innerHTML = original.titleHTML;
+          }
         }
       });
 
       // 更新计数
-      if (state.currentQuery !== "") {
+      if (query !== "") {
         searchCount?.classList.remove("hidden");
         searchCount?.classList.add("flex");
         if (countNum) countNum.textContent = visibleCount.toString();
@@ -429,7 +647,7 @@ const allTags = aiEnabled
         searchCount?.classList.remove("flex");
       }
 
-      // 更新空状态
+      // 更新无结果提示
       if (visibleCount === 0) {
         noResults?.classList.remove("hidden");
       } else {
@@ -471,11 +689,9 @@ const allTags = aiEnabled
       }
     });
 
-    // 清除主题筛选
     clearThemeBtn?.addEventListener("click", () => {
       state.currentTheme = "all";
 
-      // 更新 URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete("theme");
       window.history.pushState({}, "", newUrl);
@@ -484,21 +700,17 @@ const allTags = aiEnabled
       filterEpisodes();
     });
 
-    // 标签按钮点击事件
     tagButtons.forEach((button) => {
       button.addEventListener("click", () => {
         const tag = button.getAttribute("data-tag");
 
         if (state.currentTag === tag) {
-          // 再次点击同一标签，取消筛选
           state.currentTag = "all";
           button.classList.remove(...tagActiveClasses);
           button.classList.add(...tagInactiveClasses);
         } else {
-          // 选中新标签
           state.currentTag = tag || "all";
 
-          // 更新所有按钮样式
           tagButtons.forEach((btn) => {
             btn.classList.remove(...tagActiveClasses);
             btn.classList.add(...tagInactiveClasses);
@@ -512,13 +724,11 @@ const allTags = aiEnabled
       });
     });
 
-    // 清除标签筛选
     clearTagBtn?.addEventListener("click", () => {
       clearTagSelection();
       filterEpisodes();
     });
 
-    // 展开/收起标签
     toggleTagsBtn?.addEventListener("click", () => {
       state.tagsExpanded = !state.tagsExpanded;
 
@@ -562,17 +772,13 @@ const allTags = aiEnabled
         const year = button.getAttribute("data-year");
         state.currentYear = year || "all";
 
-        // 更新按钮样式
         updateYearButtons(button);
-
         filterEpisodes();
       });
     });
 
-    // 处理 URL 查询参数
     const urlParams = new URLSearchParams(window.location.search);
 
-    // 处理主题参数
     const themeParam = urlParams.get("theme");
     if (themeParam) {
       state.currentTheme = themeParam;
@@ -589,10 +795,8 @@ const allTags = aiEnabled
       filterEpisodes();
     }
 
-    // 初始过滤
     filterEpisodes();
   }
 
-  // 支持 View Transitions
   document.addEventListener("astro:page-load", initSearch);
 </script>

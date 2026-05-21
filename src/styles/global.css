@@ -49,7 +49,7 @@ body::before {
   pointer-events: none;
   z-index: 50;
   opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3%3Cfilter id='noiseFilter'%3%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
 /* 移动端搜索框优化 */
@@ -73,4 +73,31 @@ p.description-clamp-mobile-hidden {
     overflow: hidden !important;
     line-clamp: 2 !important;
   }
+}
+
+/* 搜索关键词高亮样式 */
+mark {
+  background-color: rgba(234, 88, 12, 0.15); /* 温暖的半透明橙黄 */
+  color: #ea580c; /* 深橙色文字 */
+  font-weight: 600;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+/* 搜索命中来源前缀：弱提示，不打断正文阅读 */
+.transcript-badge {
+  display: inline;
+  font-size: 0.78em;
+  font-family: "Noto Serif SC", serif;
+  color: #c2410c;
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  margin-right: 0.35em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: baseline;
+  white-space: nowrap;
+  opacity: 0.82;
 }

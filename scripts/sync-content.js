@@ -7,6 +7,11 @@ import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
 import DOMPurify from "isomorphic-dompurify";
 import { getRssUrl, loadSiteConfig, isAiEnabled } from "./site-config.js";
+import {
+  getProviderEnvPrefix,
+  getSupportedProvidersText,
+  normalizeProvider,
+} from "./ai-provider-config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +30,85 @@ if (!TRANSCRIPT_PLACEHOLDER) {
   throw new Error("Missing transcripts.placeholderNotice in site config.");
 }
 
+// ============ 中英文/数字自动加空格排版格式化 (autocorrect 兼容) ============
+function autocorrect(text) {
+  if (typeof text !== "string") return text;
+  
+  const placeholders = [];
+  let index = 0;
+  
+  // 1. 保护 Markdown 代码块 (``` ... ```)
+  let processed = text.replace(/(```[\s\S]*?```)/g, (match) => {
+    const key = `___BLOCK_CODE_PLACEHOLDER_${index++}___`;
+    placeholders.push({ key, val: match });
+    return key;
+  });
+  
+  // 2. 保护 Markdown 行内代码 (`...`)
+  processed = processed.replace(/(`[^`\n]+`)/g, (match) => {
+    const key = `___INLINE_CODE_PLACEHOLDER_${index++}___`;
+    placeholders.push({ key, val: match });
+    return key;
+  });
+
+  // 3. 保护 HTML 标签
+  processed = processed.replace(/(<\/?[a-zA-Z0-9:-]+(?:\s+[^>]*)?>)/g, (match) => {
+    const key = `___HTML_TAG_PLACEHOLDER_${index++}___`;
+    placeholders.push({ key, val: match });
+    return key;
+  });
+
+  // 4. 保护 Markdown 链接的 URL 部分
+  processed = processed.replace(/(\]\((?:[^)]+)\))/g, (match) => {
+    const key = `___MD_URL_PLACEHOLDER_${index++}___`;
+    placeholders.push({ key, val: match });
+    return key;
+  });
+
+  // 5. CJK 与 英文/数字 之间加空格
+  const cjk = '[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]';
+  const alphaNum = '[a-zA-Z0-9]';
+
+  processed = processed.replace(new RegExp(`(${cjk})(${alphaNum})`, 'g'), '$1 $2');
+  processed = processed.replace(new RegExp(`(${alphaNum})(${cjk})`, 'g'), '$1 $2');
+
+  // 6. 还原所有被保护的区块
+  // 占位符 key 唯一，不会相互嵌套，一次遍历还原即可
+  for (const { key, val } of placeholders) {
+    processed = processed.split(key).join(val);
+  }
+
+  return processed;
+}
+
+function formatMarkdownFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, "utf-8");
+  
+  const match = content.match(/^---([\s\S]*?)---([\s\S]*)$/);
+  if (!match) {
+    const formatted = autocorrect(content);
+    if (formatted !== content) {
+      fs.writeFileSync(filePath, formatted, "utf-8");
+    }
+    return;
+  }
+
+  const frontmatter = match[1];
+  const body = match[2];
+
+  let formattedFrontmatter = frontmatter.replace(/^(title:\s*)(['"]?)(.*?)\2(\s*)$/m, (fmMatch, prefix, quote, val, suffix) => {
+    return `${prefix}${quote}${autocorrect(val)}${quote}${suffix}`;
+  });
+
+  const formattedBody = autocorrect(body);
+
+  const finalContent = `---${formattedFrontmatter}---${formattedBody}`;
+  if (finalContent !== content) {
+    fs.writeFileSync(filePath, finalContent, "utf-8");
+  }
+}
+
 // ============ 环境变量检测 ============
 function checkEnvStatus() {
   // 首先检查配置开关
@@ -37,7 +121,7 @@ function checkEnvStatus() {
   const envExists = fs.existsSync(ENV_PATH);
 
   const providerRaw = process.env.AI_PROVIDER;
-  const provider = providerRaw ? providerRaw.trim().toLowerCase() : "";
+  const provider = normalizeProvider(providerRaw) || "";
 
   if (!provider) {
     if (!envExists) {
@@ -51,20 +135,11 @@ function checkEnvStatus() {
     return { hasEnv: envExists, hasApiKey: false };
   }
 
-  const prefix =
-    provider === "deepseek"
-      ? "DEEPSEEK"
-      : provider === "openrouter"
-        ? "OPENROUTER"
-        : provider === "xai"
-          ? "XAI"
-          : provider === "zhipu"
-            ? "ZHIPU"
-            : null;
+  const prefix = getProviderEnvPrefix(provider);
 
   if (!prefix) {
     console.log(`⚠️  AI_PROVIDER=${providerRaw} 不受支持，跳过 AI 打标功能`);
-    console.log("   支持的取值：deepseek | openrouter | xai | zhipu\n");
+    console.log(`   支持的取值：${getSupportedProvidersText()}\n`);
     return { hasEnv: envExists, hasApiKey: false };
   }
 
@@ -116,6 +191,12 @@ function clearAllData() {
     console.log("   ✓ 已清空 themes.json");
   }
 
+  // 清空 tag-taxonomy.json
+  if (fs.existsSync(TAG_TAXONOMY_PATH)) {
+    fs.unlinkSync(TAG_TAXONOMY_PATH);
+    console.log("   ✓ 已清空 tag-taxonomy.json");
+  }
+
   // 清空 transcripts 目录
   if (fs.existsSync(TRANSCRIPTS_DIR)) {
     const files = fs.readdirSync(TRANSCRIPTS_DIR);
@@ -129,11 +210,11 @@ function clearAllData() {
   }
 }
 
-async function askUserConfirm(question) {
-  // CI 环境或非交互式终端，默认返回 true（自动确认）
+async function askUserConfirm(question, defaultOnNonTTY = true) {
+  // CI 环境或非交互式终端，默认返回 defaultOnNonTTY
   if (!process.stdin.isTTY) {
-    console.log(`${question} [自动确认：Y]`);
-    return true;
+    console.log(`${question} [非交互环境，默认选择：${defaultOnNonTTY ? "Y" : "N"}]`);
+    return defaultOnNonTTY;
   }
 
   const rl = readline.createInterface({
@@ -168,7 +249,7 @@ async function checkRssChange() {
     console.log(`   当前数据：${existingEpisodes.length} 集节目`);
     console.log(`   新 RSS 地址：${RSS_URL}\n`);
 
-    const confirm = await askUserConfirm("是否清空旧数据并重新同步？[Y/n] ");
+    const confirm = await askUserConfirm("是否清空旧数据并重新同步？[Y/n] ", false);
 
     if (confirm) {
       console.log("\n正在清空旧数据...");
@@ -192,7 +273,7 @@ async function checkRssChange() {
   console.log(`   旧地址：${lastRssUrl}`);
   console.log(`   新地址：${RSS_URL}\n`);
 
-  const confirm = await askUserConfirm("是否清空旧数据并重新同步？[Y/n] ");
+  const confirm = await askUserConfirm("是否清空旧数据并重新同步？[Y/n] ", false);
 
   if (confirm) {
     console.log("\n正在清空旧数据...");
@@ -205,7 +286,6 @@ async function checkRssChange() {
   saveLastRssUrl(RSS_URL);
 }
 
-const options = parseArgs(process.argv.slice(2));
 
 function parseArgs(args) {
   const parsed = {
@@ -220,6 +300,8 @@ function parseArgs(args) {
 
   return parsed;
 }
+
+const options = parseArgs(process.argv.slice(2));
 
 function readEpisodes() {
   if (!fs.existsSync(DATA_PATH)) {
@@ -337,6 +419,9 @@ function ensureTranscriptFiles(episodesById, ids) {
 }
 
 function runAnalyzeThemes() {
+  // sync 是“自动流程入口”：
+  // 当 themes.json 不存在时，这里自动调用 analyze-themes.js 先生成主题分类体系，
+  // 然后下面的 runTagging() 再基于 themes.json 给节目写入 themeId / tags。
   console.log("正在分析主题并生成 themes.json...");
   const analyzeScript = path.join(__dirname, "analyze-themes.js");
   const result = spawnSync(process.execPath, [analyzeScript], { stdio: "inherit" });
@@ -385,6 +470,20 @@ function runTagging(ids, envStatus) {
 }
 
 async function syncContent() {
+  // 检查是否开启了 AI 打标功能
+  const aiEnabled = isAiEnabled();
+  
+  if (!aiEnabled) {
+    if (fs.existsSync(THEMES_PATH)) {
+      fs.unlinkSync(THEMES_PATH);
+      console.log("   ✓ AI 功能已关闭，清理历史 themes.json");
+    }
+    if (fs.existsSync(TAG_TAXONOMY_PATH)) {
+      fs.unlinkSync(TAG_TAXONOMY_PATH);
+      console.log("   ✓ AI 功能已关闭，清理历史 tag-taxonomy.json");
+    }
+  }
+
   // 检测环境变量状态
   const envStatus = checkEnvStatus();
 
@@ -427,9 +526,17 @@ async function syncContent() {
     mergedEpisodes.push(...orphaned);
   }
 
-  writeEpisodes(mergedEpisodes);
+  // 对 mergedEpisodes 文本字段做中英文混排加空格排版优化
+  const formattedEpisodes = mergedEpisodes.map((ep) => ({
+    ...ep,
+    title: autocorrect(ep.title),
+    contentSnippet: autocorrect(ep.contentSnippet),
+    content: autocorrect(ep.content),
+  }));
 
-  const episodesById = new Map(mergedEpisodes.map((ep) => [ep.id, ep]));
+  writeEpisodes(formattedEpisodes);
+
+  const episodesById = new Map(formattedEpisodes.map((ep) => [ep.id, ep]));
   let transcriptCount = 0;
   if (!options.skipTranscripts) {
     transcriptCount = ensureTranscriptFiles(episodesById, updatedIds);
@@ -437,12 +544,95 @@ async function syncContent() {
     console.log("Skip transcripts: --skip-transcripts enabled.");
   }
 
+  // 格式化所有的 markdown 文字稿文件，确保排版完美匹配 VSCode autocorrect 插件
+  if (fs.existsSync(TRANSCRIPTS_DIR)) {
+    console.log("正在对所有的播客文稿进行中英文排版自动优化...");
+    const files = fs.readdirSync(TRANSCRIPTS_DIR);
+    let formattedCount = 0;
+    files.forEach((file) => {
+      if (file.endsWith(".md") && !file.startsWith("_")) {
+        formatMarkdownFile(path.join(TRANSCRIPTS_DIR, file));
+        formattedCount++;
+      }
+    });
+    console.log(`✓ 成功格式化了 ${formattedCount} 个文稿文件！`);
+  }
+
+  // 生成文字稿目录索引，方便在 VS Code 中快速查找对应文件
+  generateTranscriptIndex(formattedEpisodes);
+
   console.log(`Episodes fetched: ${incomingEpisodes.length}`);
   console.log(`New episodes: ${newIds.length}`);
   console.log(`Updated episodes: ${updatedIds.length - newIds.length}`);
   console.log(`Transcript templates created: ${transcriptCount}`);
 
   runTagging(updatedIds, envStatus);
+}
+
+// ============ 文字稿目录索引生成 ============
+function generateTranscriptIndex(episodes) {
+  if (!fs.existsSync(TRANSCRIPTS_DIR)) return;
+
+  // 按发布日期从旧到新排序（第 001 期是最早的）
+  const sorted = [...episodes]
+    .filter((ep) => ep.pubDate)
+    .sort((a, b) => new Date(a.pubDate) - new Date(b.pubDate));
+
+  const rows = sorted.map((ep, i) => {
+    const num = String(i + 1).padStart(3, "0");
+    const title = (ep.title || "(无标题)").replace(/\|/g, "｜"); // 转义表格竖线
+    const filename = `${ep.id}.md`;
+    const filePath = path.join(TRANSCRIPTS_DIR, filename);
+
+    let status;
+    if (!fs.existsSync(filePath)) {
+      status = "🔴 缺失";
+    } else {
+      const fileContent = fs.readFileSync(filePath, "utf-8");
+      // 仅当包含系统配置的占位通知文本时，才判定为“待补充”
+      const isPlaceholder = fileContent.includes(TRANSCRIPT_PLACEHOLDER);
+      status = isPlaceholder ? "🟡 待补充" : "🟢 完整";
+    }
+
+    // 节目标题直接作为超链接，点击跳转对应文稿
+    return `| ${num} | [${title}](./${filename}) | ${status} |`;
+  });
+
+  const totalComplete = rows.filter((r) => r.includes("🟢 完整")).length;
+  const totalPlaceholder = rows.filter((r) => r.includes("🟡 待补充")).length;
+  const totalMissing = rows.filter((r) => r.includes("🔴 缺失")).length;
+
+  // 只保留日期格式 (YYYY-MM-DD)
+  const now = new Date().toLocaleDateString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).replace(/\//g, "-");
+
+  // 加 frontmatter 满足 Astro transcripts collection 的 schema（字段均可选）
+  const indexContent = [
+    `---`,
+    `title: "文字稿目录索引（自动生成）"`,
+    `contributors: []`,
+    `---`,
+    ``,
+    `# 文字稿目录索引`,
+    ``,
+    `> 💡 **自动更新提示**：此文件由 \`sync-content.js\` 自动生成，请勿手动编辑。`,
+    `> 📅 **最后更新时间**：${now}`,
+    `> 📊 **统计数据**：共 **${sorted.length}** 期节目 | 🟢 完整 **${totalComplete}** 期 | 🟡 待补充 **${totalPlaceholder}** 期` + (totalMissing > 0 ? ` | 🔴 缺失 **${totalMissing}** 期` : ""),
+    ``,
+    `提示：在支持 Markdown 预览或链接跳转的编辑器（如 VS Code）中，按住 \`Ctrl\`（Mac 用户按住 \`Cmd\` ⌘）点击下表中的**节目标题**，即可直接打开并编辑对应的文字稿文件。`,
+    ``,
+    `| 序号 | 节目标题 | 文字稿状态 |`,
+    `|------|----------|------------|`,
+    ...rows,
+  ].join("\n");
+
+  const indexPath = path.join(TRANSCRIPTS_DIR, "_index.md");
+  fs.writeFileSync(indexPath, indexContent, "utf-8");
+  console.log(`✓ 已生成文字稿目录索引 → _index.md（${sorted.length} 期）`);
 }
 
 syncContent().catch((error) => {

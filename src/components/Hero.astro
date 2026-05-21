@@ -30,7 +30,6 @@ const progressPercent = (progressPct * 100).toFixed(0);
         data-title={latestEpisode.title}
         data-audio={latestEpisode.enclosure?.url}
         data-cover={coverImage}
-        aria-label={site.ui.playLatestAriaLabel}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -171,11 +170,11 @@ const progressPercent = (progressPct * 100).toFixed(0);
 
       <div class="grow min-w-0 flex flex-col justify-between gap-2">
         <div>
-          <h3 class="text-sm sm:text-base font-bold leading-tight line-clamp-2 group-hover:text-orange-800 transition-colors">
+          <h2 class="text-sm sm:text-base font-bold leading-tight line-clamp-2 group-hover:text-orange-800 transition-colors">
             <a href={`/episodes/${latestEpisode.id}`}>
               {latestEpisode.title}
             </a>
-          </h3>
+          </h2>
           <div class="flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs opacity-50 font-serif italic mt-1">
             <span>{formattedDate}</span>
             {latestEpisode.itunes?.duration && (

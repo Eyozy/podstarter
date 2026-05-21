@@ -22,13 +22,14 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
 <div
   class="w-full bg-white border border-[#2d2a26]/5 shadow-sm hover:shadow-md transition-all group relative rounded-2xl overflow-hidden flex flex-col"
   data-episode-card
+  data-id={episode.id}
   data-compact={compact ? "true" : "false"}
 >
   <!-- 主内容区：图片 + 信息 -->
     <div
       class:list={[
         "flex gap-3 sm:gap-4 p-3 sm:p-4 items-stretch",
-        compact ? "items-stretch" : "md:items-start",
+        compact ? "items-stretch" : "items-start",
       ]}
     >
     <!-- 封面图：小屏幕自适应，大屏幕固定尺寸 -->
@@ -36,7 +37,7 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
       class:list={[
         "shrink-0 flex-none self-start overflow-hidden bg-[#f0ede8] border border-[#2d2a26]/5 shadow-inner rounded-xl aspect-square",
         compact
-          ? "w-[80px] sm:w-[88px] md:w-[104px] lg:w-[112px]"
+          ? "w-20 sm:w-22 md:w-26 lg:w-28"
           : "w-[clamp(64px,24vw,88px)] sm:w-24 md:w-32 lg:w-36",
       ]}
       data-card-cover
@@ -65,7 +66,7 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
           >
             {episodeNumberLabel}
           </span>
-          <span class="text-[10px] font-serif opacity-40">{formattedDate}</span>
+          <span class="text-[10px] font-serif text-[#6f685f]">{formattedDate}</span>
         </div>
 
         <!-- 标题（最多2行） -->
@@ -80,7 +81,7 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
           data-min-scale={compact ? "1" : "0.75"}
           data-min-font={compact ? "12" : "12"}
         >
-          <a href={`/episodes/${episode.id}`}>{episode.title}</a>
+          <a href={`/episodes/${episode.id}`} data-card-title-link={episode.id}>{episode.title}</a>
         </h3>
 
         <!-- 描述（仅完整版显示） -->
@@ -88,11 +89,12 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
           episode.contentSnippet && (
             <p
               class:list={[
-                "opacity-60 font-serif leading-relaxed",
+                "font-serif leading-relaxed text-[#70695f]",
                 compact
                   ? "text-[11px] leading-snug line-clamp-1 mb-1"
                   : "text-[11px] leading-snug line-clamp-1 sm:text-xs sm:leading-relaxed sm:line-clamp-1 md:text-sm md:line-clamp-2 mb-1.5",
               ]}
+              data-episode-snippet={episode.id}
             >
               {episode.contentSnippet}
             </p>
@@ -113,7 +115,7 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
               <span
                 class:list={[
                   "text-[10px] font-serif px-2 py-0.5 bg-[#f5f2ed] text-[#2d2a26]/60 rounded-md border border-[#2d2a26]/5",
-                  compact ? "inline-flex whitespace-nowrap max-w-[96px] truncate" : index > 1 ? "hidden md:inline-flex" : "inline-flex",
+                  compact ? "inline-flex whitespace-nowrap max-w-24 truncate" : index > 1 ? "hidden md:inline-flex" : "inline-flex",
                 ]}
               >
                 {tag}
@@ -129,7 +131,7 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
   <div
     class="flex items-center justify-between gap-2 flex-nowrap px-3 sm:px-4 py-3 border-t border-[#2d2a26]/5 bg-[#fafaf9]"
   >
-    <div class="flex items-center gap-x-2 text-[10px] sm:text-[11px] font-serif opacity-50 whitespace-nowrap">
+    <div class="flex items-center gap-x-2 text-[10px] sm:text-[11px] font-serif text-[#6f685f] whitespace-nowrap">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         class="size-3.5 sm:size-4"
@@ -255,7 +257,9 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
       // 移动端不做标题缩放，保持可读性
       if (window.innerWidth < MIN_WIDTH) return;
 
-      const cards = allCards.filter((card) => card.offsetParent !== null);
+      const cards = allCards.filter(
+        (card): card is HTMLElement => card instanceof HTMLElement && card.offsetParent !== null,
+      );
       let minSize = Number.POSITIVE_INFINITY;
       const titles: HTMLElement[] = [];
 

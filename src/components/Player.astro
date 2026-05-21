@@ -14,7 +14,7 @@ const minimalEpisodes = episodes.map((ep) => ({
 <div
   id="global-player"
   transition:persist
-  class="fixed bottom-4 right-4 z-50 transition-all duration-500 opacity-0 scale-0 pointer-events-none sm:bottom-8 sm:right-8"
+  class="fixed bottom-2 right-2 z-50 transition-all duration-500 opacity-0 scale-0 pointer-events-none sm:bottom-6 sm:right-6 md:bottom-8 md:right-8"
 >
   <!-- 最小化后的悬浮球 -->
   <button
@@ -92,14 +92,14 @@ const minimalEpisodes = episodes.map((ep) => ({
   <!-- 展开后的播放器卡片 -->
   <div
     id="player-expanded-card"
-    class="absolute bottom-0 right-0 z-10 w-[calc(100vw-3rem)] sm:w-90 md:w-105 lg:w-120 border border-[#2d2a26]/20 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl bg-white/95 transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) origin-bottom-right"
+    class="absolute bottom-0 right-0 z-10 w-[min(calc(100vw-1rem),24rem)] sm:w-90 md:w-105 lg:w-120 border border-[#2d2a26]/20 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-xl sm:rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl bg-white/95 transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) origin-bottom-right"
   >
     <!-- 顶部拖拽/控制栏 -->
     <div
-      class="px-4 py-2 bg-[#f5f2ed] border-b border-[#2d2a26]/10 flex justify-between items-center cursor-move"
+      class="px-3 py-1.5 sm:px-4 sm:py-2 bg-[#f5f2ed] border-b border-[#2d2a26]/10 flex justify-between items-center cursor-move"
     >
       <span
-        class="text-[10px] font-serif font-bold uppercase tracking-tighter opacity-40"
+        class="text-[9px] sm:text-[10px] font-serif font-bold uppercase tracking-tighter opacity-40"
         >{site.player.nowPlayingLabel}</span
       >
       <div class="flex items-center gap-1">
@@ -146,11 +146,11 @@ const minimalEpisodes = episodes.map((ep) => ({
       </div>
     </div>
 
-    <div class="p-5">
-      <div class="flex gap-4 mb-6">
+    <div class="p-3 sm:p-5">
+      <div class="flex items-start gap-2.5 sm:gap-4 mb-4 sm:mb-6">
         <!-- 封面图 -->
         <div
-          class="w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-[#2d2a26]/10 shadow-inner bg-[#f0ede8]"
+          class="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-lg sm:rounded-xl overflow-hidden border border-[#2d2a26]/10 shadow-inner bg-[#f0ede8]"
         >
           <img
             id="player-cover"
@@ -161,27 +161,24 @@ const minimalEpisodes = episodes.map((ep) => ({
         </div>
 
         <!-- 标题信息 -->
-        <div class="grow min-w-0 flex flex-col justify-center">
-          <h3
-            id="player-title"
-            class="text-base font-bold leading-tight mb-1 truncate"
-          >
+        <div class="grow min-w-0 flex flex-col justify-center pt-0.5">
+          <h3 id="player-title" class="text-[13px] sm:text-base font-bold leading-snug mb-1 line-clamp-2">
             {site.player.notPlayingLabel}
           </h3>
-          <p class="text-xs opacity-50 font-serif">{site.brand.name}</p>
+          <p class="text-[11px] sm:text-xs opacity-50 font-serif">{site.brand.name}</p>
         </div>
       </div>
 
       <!-- 进度条 -->
-      <div class="mb-6 select-none">
+      <div class="mb-4 sm:mb-6 select-none">
         <div
-          class="flex justify-between text-[10px] font-serif opacity-40 mb-1.5"
+          class="flex justify-between text-[10px] font-serif opacity-40 mb-1"
         >
           <span id="player-current-time">00:00</span>
           <span id="player-duration">00:00</span>
         </div>
         <div
-          class="group h-3 -my-1 py-1 cursor-pointer"
+          class="group h-3 py-1 cursor-pointer"
           id="progress-container"
           role="slider"
           tabindex="0"
@@ -192,7 +189,7 @@ const minimalEpisodes = episodes.map((ep) => ({
           aria-valuetext="00:00"
         >
           <div
-            class="h-1.5 bg-[#2d2a26]/5 rounded-full relative overflow-visible"
+            class="h-1 bg-[#2d2a26]/5 rounded-full relative overflow-visible"
           >
             <div
               id="progress-bar"
@@ -201,7 +198,7 @@ const minimalEpisodes = episodes.map((ep) => ({
             </div>
             <div
               id="progress-handle"
-              class="absolute top-1/2 -translate-y-1/2 -ml-1 w-3 h-3 bg-orange-700 rounded-full border-2 border-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none scale-0 group-hover:scale-100"
+              class="absolute top-1/2 -translate-y-1/2 -ml-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-orange-700 rounded-full border-2 border-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none scale-0 group-hover:scale-100"
             >
             </div>
           </div>
@@ -209,32 +206,32 @@ const minimalEpisodes = episodes.map((ep) => ({
       </div>
 
       <!-- 主控制按钮 -->
-      <div class="flex items-center justify-between px-2">
+      <div class="flex items-center justify-between gap-1 px-0.5 sm:px-2">
         <button
           id="player-prev"
-          class="p-2 text-[#2d2a26] opacity-40 hover:opacity-100 disabled:opacity-10 transition-all"
+          class="p-1.5 sm:p-2 text-[#2d2a26] opacity-40 hover:opacity-100 disabled:opacity-10 transition-all"
           title={site.player.prevLabel}
           aria-label={site.player.prevLabel}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            class="size-5 sm:size-6"
+            class="size-4 sm:size-6"
             fill="currentColor"
             viewBox="0 0 24 24"
             ><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"></path></svg
           >
         </button>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-1.5 sm:gap-4">
           <button
             id="player-backward"
-            class="p-2 text-[#2d2a26] opacity-40 hover:opacity-100 transition-all"
+            class="p-1.5 sm:p-2 text-[#2d2a26] opacity-40 hover:opacity-100 transition-all"
             title={site.player.backwardLabel}
             aria-label={site.player.backwardLabel}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="size-5 sm:size-6"
+              class="size-4 sm:size-6"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -249,14 +246,14 @@ const minimalEpisodes = episodes.map((ep) => ({
 
           <button
             id="player-play-pause"
-            class="w-14 h-14 bg-[#2d2a26] text-white rounded-full flex items-center justify-center hover:bg-orange-800 transition-all shadow-xl hover:scale-105 active:scale-95"
+            class="w-11 h-11 sm:w-14 sm:h-14 bg-[#2d2a26] text-white rounded-full flex items-center justify-center hover:bg-orange-800 transition-all shadow-xl hover:scale-105 active:scale-95"
             aria-label={site.player.playAriaLabel}
             aria-pressed="false"
           >
             <svg
               id="play-icon"
               xmlns="http://www.w3.org/2000/svg"
-              class="size-6 sm:size-7"
+              class="size-5 sm:size-7"
               viewBox="0 0 24 24"
               fill="currentColor"
             >
@@ -267,7 +264,7 @@ const minimalEpisodes = episodes.map((ep) => ({
             <svg
               id="pause-icon"
               xmlns="http://www.w3.org/2000/svg"
-              class="size-6 sm:size-7 hidden"
+              class="size-5 sm:size-7 hidden"
               fill="currentColor"
               viewBox="0 0 24 24"
             >
@@ -277,13 +274,13 @@ const minimalEpisodes = episodes.map((ep) => ({
 
           <button
             id="player-forward"
-            class="p-2 text-[#2d2a26] opacity-40 hover:opacity-100 transition-all"
+            class="p-1.5 sm:p-2 text-[#2d2a26] opacity-40 hover:opacity-100 transition-all"
             title={site.player.forwardLabel}
             aria-label={site.player.forwardLabel}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="size-5 sm:size-6"
+              class="size-4 sm:size-6"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -299,13 +296,13 @@ const minimalEpisodes = episodes.map((ep) => ({
 
         <button
           id="player-next"
-          class="p-2 text-[#2d2a26] opacity-40 hover:opacity-100 disabled:opacity-10 transition-all"
+          class="p-1.5 sm:p-2 text-[#2d2a26] opacity-40 hover:opacity-100 disabled:opacity-10 transition-all"
           title={site.player.nextLabel}
           aria-label={site.player.nextLabel}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            class="size-5 sm:size-6"
+            class="size-4 sm:size-6"
             fill="currentColor"
             viewBox="0 0 24 24"
             ><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg
@@ -329,9 +326,42 @@ const minimalEpisodes = episodes.map((ep) => ({
   let isMinimized = false;
   let isDragging = false;
   let currentEpisodeIndex = -1;
-  const preloadCache = new Set();
   const SEEK_SECONDS = 15;
   const PROGRESS_CIRCUMFERENCE = 301.5;
+
+  function isSameAudioSource(currentSrc, targetSrc) {
+    if (!currentSrc || !targetSrc) return false;
+
+    try {
+      return new URL(currentSrc, "http://localhost").href ===
+        new URL(targetSrc, "http://localhost").href;
+    } catch {
+      return currentSrc === targetSrc;
+    }
+  }
+
+  function syncAudioSeek(audio, seconds) {
+    if (!audio || !Number.isFinite(seconds)) return;
+
+    const targetTime = Math.max(0, seconds);
+    const applySeek = () => {
+      audio.currentTime = targetTime;
+    };
+
+    if (audio.readyState >= 1) {
+      applySeek();
+      return;
+    }
+
+    const handleReady = () => {
+      applySeek();
+      audio.removeEventListener("loadedmetadata", handleReady);
+      audio.removeEventListener("canplay", handleReady);
+    };
+
+    audio.addEventListener("loadedmetadata", handleReady, { once: true });
+    audio.addEventListener("canplay", handleReady, { once: true });
+  }
 
   // 公共样式类常量
   const HIDDEN_CLASSES = [
@@ -401,16 +431,6 @@ const minimalEpisodes = episodes.map((ep) => ({
     };
   }
 
-  function preloadAudio(url) {
-    if (!url || preloadCache.has(url)) return;
-
-    // 使用临时音频对象触发 DNS 解析 + 预缓存
-    const tempAudio = new Audio();
-    tempAudio.preload = "auto";
-    tempAudio.src = url;
-    preloadCache.add(url);
-  }
-
   function setEpisodeUI(elements, episode, coverOverride) {
     const coverImage = coverOverride || episode.cover || defaultCover;
     if (elements.audio) elements.audio.src = episode.audioUrl;
@@ -420,12 +440,14 @@ const minimalEpisodes = episodes.map((ep) => ({
   }
 
   function initPlayer() {
+    const audio = document.getElementById("main-audio");
+    if (!audio) return;
+
     const elements = getPlayerElements();
     const {
       playerContainer,
       expandedCard,
       minimizedBall,
-      audio,
       playPauseBtn,
       playIcon,
       pauseIcon,
@@ -447,24 +469,6 @@ const minimalEpisodes = episodes.map((ep) => ({
       minPauseIcon,
       minCoverEl,
     } = elements;
-
-    if (!audio) return;
-
-    // 悬停/触摸预加载，缩短首播等待时间
-    document.querySelectorAll(".play-button").forEach((btn) => {
-      btn.addEventListener("mouseenter", () => {
-        const url = btn.getAttribute("data-audio");
-        if (url) preloadAudio(url);
-      });
-      btn.addEventListener(
-        "touchstart",
-        () => {
-          const url = btn.getAttribute("data-audio");
-          if (url) preloadAudio(url);
-        },
-        { passive: true },
-      );
-    });
 
     // Draggable Progress Logic
     function updateProgressVisual(percent) {
@@ -571,36 +575,12 @@ const minimalEpisodes = episodes.map((ep) => ({
       }
     });
 
-    // 移除旧监听器再添加新的，防止 View Transitions 导致重复绑定
-    document.removeEventListener("mousemove", handleDocMouseMove);
-    document.removeEventListener("mouseup", handleDocMouseUp);
-    document.removeEventListener("touchmove", handleDocTouchMove);
-    document.removeEventListener("touchend", handleDocTouchEnd);
-
     document.addEventListener("mousemove", handleDocMouseMove);
     document.addEventListener("mouseup", handleDocMouseUp);
     document.addEventListener("touchmove", handleDocTouchMove, {
       passive: true,
     });
     document.addEventListener("touchend", handleDocTouchEnd);
-
-    // 页面切换前清理事件监听器
-    document.addEventListener(
-      "astro:before-swap",
-      () => {
-        document.removeEventListener("mousemove", handleDocMouseMove);
-        document.removeEventListener("mouseup", handleDocMouseUp);
-        document.removeEventListener("touchmove", handleDocTouchMove);
-        document.removeEventListener("touchend", handleDocTouchEnd);
-      },
-      { once: true },
-    );
-
-    if (audio.dataset.initialized) {
-      updateNavButtons();
-      return;
-    }
-    audio.dataset.initialized = "true";
 
     function formatTime(seconds) {
       if (isNaN(seconds)) return "00:00";
@@ -640,9 +620,13 @@ const minimalEpisodes = episodes.map((ep) => ({
       if (index < 0 || index >= allEpisodes.length) return;
 
       const ep = allEpisodes[index];
+      const episodeUrl = ep.audioUrl;
 
       // If same episode and just paused, then play
-      if (currentEpisodeIndex === index && audio.src === ep.enclosure?.url) {
+      if (
+        currentEpisodeIndex === index &&
+        isSameAudioSource(audio.currentSrc || audio.src, episodeUrl)
+      ) {
         audio.play();
         updatePlayState();
         return;
@@ -666,6 +650,12 @@ const minimalEpisodes = episodes.map((ep) => ({
       if (nextBtn)
         nextBtn.disabled = currentEpisodeIndex >= allEpisodes.length - 1;
     }
+
+    if (audio.dataset.initialized) {
+      updateNavButtons();
+      return;
+    }
+    audio.dataset.initialized = "true";
 
     // Toggle Minimize
     function toggleMinimize(min) {
@@ -773,33 +763,48 @@ const minimalEpisodes = episodes.map((ep) => ({
 
       if (idx !== -1) {
         const ep = allEpisodes[idx];
+        const isCurrentEpisode =
+          currentEpisodeIndex === idx &&
+          isSameAudioSource(audio.currentSrc || audio.src, url);
 
-        if (currentEpisodeIndex === idx && audio.src === url) {
-          audio.currentTime = seconds;
-          if (audio.paused) audio.play();
-        } else {
+        if (!isCurrentEpisode) {
           currentEpisodeIndex = idx;
           setEpisodeUI(elements, ep, cover);
 
           // Show player
           setPlayerVisible(playerContainer, true);
           toggleMinimize(false);
-
-          audio
-            .play()
-            .then(() => {
-              audio.currentTime = seconds;
-            })
-            .catch((e) => console.log("Play failed", e));
-          updatePlayState();
           updateNavButtons();
         }
+
+        syncAudioSeek(audio, seconds);
+        if (audio.paused) {
+          audio.play().catch((e) => console.log("Play failed", e));
+        }
+        updatePlayState();
       }
     };
   }
 
   // View Transitions support
   document.addEventListener("astro:page-load", initPlayer);
+
+  // 全局悬停/触摸预加载委托（模块级单例，注册一次终身受用）
+  if (!window.__globalPlayerPreloadBound) {
+    window.__globalPlayerPreloadBound = true;
+    document.addEventListener("mouseover", (e) => {
+      const btn = e.target.closest(".play-button");
+      if (!btn) return;
+      const url = btn.getAttribute("data-audio");
+      if (url) preloadAudio(url);
+    });
+    document.addEventListener("touchstart", (e) => {
+      const btn = e.target.closest(".play-button");
+      if (!btn) return;
+      const url = btn.getAttribute("data-audio");
+      if (url) preloadAudio(url);
+    }, { passive: true });
+  }
 
   // Listen for global play clicks
   document.addEventListener("click", (e) => {

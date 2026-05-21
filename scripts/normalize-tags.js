@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { normalizeTags, fillTags } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,48 +22,8 @@ function readJson(filePath, label) {
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }
 
-function normalizeTags(rawTags, aliases, allowedTags) {
-  if (!Array.isArray(rawTags)) {
-    return [];
-  }
-
-  const normalized = [];
-  for (const rawTag of rawTags) {
-    if (rawTag === null || rawTag === undefined) {
-      continue;
-    }
-    const trimmed = String(rawTag).trim().replace(/^#/, "");
-    if (!trimmed) {
-      continue;
-    }
-    const mapped = aliases[trimmed] || trimmed;
-    if (!allowedTags.has(mapped)) {
-      continue;
-    }
-    if (!normalized.includes(mapped)) {
-      normalized.push(mapped);
-    }
-  }
-  return normalized;
-}
-
-function fillTags(primaryTags, fallbackTags, minCount, maxCount) {
-  const tags = [...primaryTags];
-  for (const tag of fallbackTags) {
-    if (tags.length >= maxCount) {
-      break;
-    }
-    if (!tags.includes(tag)) {
-      tags.push(tag);
-    }
-  }
-
-  if (tags.length > maxCount) {
-    return tags.slice(0, maxCount);
-  }
-
-  return tags;
-}
+// normalizeTags 和 fillTags 已提取到 scripts/utils.js，从那里统一导入。
+// normalize-tags.js 需要去除 # 前缀，调用时传入 stripHash: true。
 
 function arraysEqual(a, b) {
   if (a === b) return true;
@@ -99,7 +60,7 @@ function normalizeAllTags() {
 
   const updatedEpisodes = episodes.map((episode) => {
     const rawTags = Array.isArray(episode.tags) ? episode.tags : [];
-    const normalizedTags = normalizeTags(rawTags, tagAliases, allowedTags);
+    const normalizedTags = normalizeTags(rawTags, tagAliases, allowedTags, true);
     totalDropped += Math.max(0, rawTags.length - normalizedTags.length);
 
     const theme = episode.themeId ? themeMap.get(episode.themeId) : null;
@@ -107,7 +68,7 @@ function normalizeAllTags() {
       missingThemeCount += 1;
     }
     const fallbackTags = theme
-      ? normalizeTags(theme.representativeTags, tagAliases, allowedTags)
+      ? normalizeTags(theme.representativeTags, tagAliases, allowedTags, true)
       : [];
     const finalTags = fillTags(normalizedTags, fallbackTags, MIN_TAGS, MAX_TAGS);
 

@@ -1,20 +1,18 @@
 import "dotenv/config";
+import {
+  getProviderEnvPrefix,
+  normalizeProvider,
+  SUPPORTED_PROVIDERS,
+  providerSupportsJsonResponseFormat,
+} from "./ai-provider-config.js";
 
 const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant.";
-
-const SUPPORTED_PROVIDERS = ["deepseek", "openrouter", "xai", "zhipu"];
 
 function readRequiredEnv(name) {
   const value = process.env[name];
   if (!value) {
     throw new Error(`${name} is missing in environment variables`);
   }
-  return value;
-}
-
-function normalizeProvider(raw) {
-  const value = String(raw || "").trim().toLowerCase();
-  if (!value) return null;
   return value;
 }
 
@@ -29,14 +27,10 @@ export function getActiveAiInfo() {
     );
   }
 
-  const prefix =
-    provider === "deepseek"
-      ? "DEEPSEEK"
-      : provider === "openrouter"
-        ? "OPENROUTER"
-        : provider === "xai"
-          ? "XAI"
-          : "ZHIPU";
+  const prefix = getProviderEnvPrefix(provider);
+  if (!prefix) {
+    throw new Error(`Unsupported provider prefix for: ${provider}`);
+  }
 
   const apiUrl = readRequiredEnv(`${prefix}_API_URL`);
   const model = readRequiredEnv(`${prefix}_MODEL`);
@@ -46,14 +40,10 @@ export function getActiveAiInfo() {
 function getProviderRequestConfig() {
   const { provider, apiUrl, model } = getActiveAiInfo();
 
-  const prefix =
-    provider === "deepseek"
-      ? "DEEPSEEK"
-      : provider === "openrouter"
-        ? "OPENROUTER"
-        : provider === "xai"
-          ? "XAI"
-          : "ZHIPU";
+  const prefix = getProviderEnvPrefix(provider);
+  if (!prefix) {
+    throw new Error(`Unsupported provider prefix for: ${provider}`);
+  }
 
   const apiKey = readRequiredEnv(`${prefix}_API_KEY`);
 
@@ -83,7 +73,7 @@ export async function askAI(
   systemPrompt = DEFAULT_SYSTEM_PROMPT,
   options = {},
 ) {
-  const { apiUrl, model, headers } = getProviderRequestConfig();
+  const { provider, apiUrl, model, headers } = getProviderRequestConfig();
 
   const { timeoutMs = 30000, temperature = 0.7 } = options;
   const controller = new AbortController();
@@ -112,10 +102,21 @@ export async function askAI(
       });
     }
 
-    // 优先尝试 OpenAI 风格的 response_format；如果 provider 不支持，再回退重试一次。
-    let response = await sendRequest(true);
-    if (!response.ok && [400, 404, 415, 422].includes(response.status)) {
+    // 根据 provider 能力决定请求策略：
+    // - 已知支持 response_format：直接使用，无需回退
+    // - 已知不支持：直接不传，无需尝试
+    // - 未知 (null)：保留原有先尝试后回退策略
+    const rfSupport = providerSupportsJsonResponseFormat(provider);
+    let response;
+    if (rfSupport === true) {
+      response = await sendRequest(true);
+    } else if (rfSupport === false) {
       response = await sendRequest(false);
+    } else {
+      response = await sendRequest(true);
+      if (!response.ok && [400, 404, 415, 422].includes(response.status)) {
+        response = await sendRequest(false);
+      }
     }
 
     if (!response.ok) {

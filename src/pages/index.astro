@@ -1,7 +1,7 @@
 ---
 import MainLayout from "../layouts/MainLayout.astro";
 import Hero from "../components/Hero.astro";
-import GuideSection from "../components/GuideSection.astro";
+import EpisodeCard from "../components/EpisodeCard.astro";
 import RSSSection from "../components/RSSSection.astro";
 import episodes from "../data/episodes.json";
 // 首页区块标题文案在 site.json 中配置。
@@ -9,82 +9,36 @@ import site from "../data/site.json";
 
 // 跳过 Hero 使用的第一集，展示近期更新
 const recentEpisodes = episodes.slice(1, 6);
-
-// AI 功能开关
-const aiEnabled = site.features?.aiTagging === true;
 ---
 
 <MainLayout title={site.pages.home.title}>
   <Hero />
 
-  {aiEnabled && <GuideSection />}
-
-  <section class="mb-24">
+  <section class="mb-14 md:mb-16">
     <div
-      class="flex items-center justify-between mb-12 border-b border-[#2d2a26]/10 pb-4"
+      class="flex items-end justify-between gap-4 sm:gap-6 mb-8 md:mb-12 border-b border-[#2d2a26]/10 pb-5"
     >
-      <h2 class="text-3xl font-bold">{site.sections.recentTitle}</h2>
-      <a href="/episodes" class="text-sm font-serif relative group py-1">
+      <div class="space-y-2">
+        <p class="text-[10px] md:text-[11px] font-serif font-bold uppercase tracking-[0.24em] text-orange-900/80">
+          {site.sections.recentSubtitle}
+        </p>
+        <h2 class="text-3xl sm:text-4xl md:text-4xl font-bold tracking-tight">{site.sections.recentTitle}</h2>
+      </div>
+      <a
+        href="/episodes"
+        class="shrink-0 text-sm font-serif relative group py-1.5 text-[#5f584f] hover:text-[#2d2a26] transition-colors whitespace-nowrap"
+      >
+        <span class="relative z-10">{site.sections.recentBrowseAllLabel}</span>
         <span
-          class="relative z-10 opacity-60 group-hover:opacity-100 transition-opacity"
-          >{site.sections.recentBrowseAllLabel}</span
-        >
-        <span
-          class="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-700 transition-all duration-300 group-hover:w-full"
+          class="absolute bottom-0 left-0 w-0 h-px bg-orange-700 transition-all duration-300 group-hover:w-full"
         ></span>
       </a>
     </div>
 
-    <div class="space-y-6">
+    <div class="space-y-4 md:space-y-5">
       {
         recentEpisodes.map((episode) => (
-          <div class="flex flex-col group py-6 border-b border-[#2d2a26]/5 hover:bg-white/40 transition-colors px-4 -mx-4 rounded-2xl">
-            <div
-              class="flex items-center group/item cursor-pointer play-button grow"
-              role="button"
-              tabindex="0"
-              aria-label={`播放 ${episode.title}`}
-              data-title={episode.title}
-              data-audio={episode.enclosure?.url}
-              data-cover={episode.itunes?.image || site.assets.defaultCover}
-            >
-              <div class="grow">
-                <span class="text-xs font-serif opacity-40 mb-2 block">
-                  {new Date(episode.pubDate).toLocaleDateString("zh-CN")}
-                </span>
-                <h3 class="text-xl font-bold group-hover:text-orange-800 group-hover/item:text-orange-800 transition-colors">
-                  {episode.title}
-                </h3>
-                <p class="text-sm opacity-60 mt-2 font-serif description-clamp-2">
-                  {episode.contentSnippet}
-                </p>
-              </div>
-            </div>
-            <div class="mt-4 flex items-center justify-end space-x-4">
-              <a
-                href={`/episodes/${episode.id}`}
-                class="text-[10px] font-serif font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
-              >
-                {site.ui.detailLabel}
-              </a>
-              <button
-                class="play-button w-10 h-10 flex items-center justify-center bg-[#2d2a26] text-white rounded-full hover:bg-orange-800 transition-all shadow-md hover:shadow-orange-900/10 hover:-translate-y-0.5 active:translate-y-0"
-                data-title={episode.title}
-                data-audio={episode.enclosure?.url}
-                data-cover={episode.itunes?.image || site.assets.defaultCover}
-                title={site.ui.playLabel}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="size-4 sm:size-5 translate-x-0.5"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M7 4.406c0-.853.947-1.354 1.649-.865l10.211 7.112c.621.432.621 1.34 0 1.772l-10.211 7.112c-.702.489-1.649-.012-1.649-.865V4.406z" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          <EpisodeCard episode={episode} />
         ))
       }
     </div>

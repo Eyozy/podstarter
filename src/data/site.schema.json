@@ -134,6 +134,7 @@
         "rssLabels"
       ],
       "properties": {
+        "recentSubtitle": { "type": "string", "description": "首页近期更新区块的英文副标题（如 Recent）" },
         "recentTitle": { "type": "string" },
         "recentBrowseAllLabel": { "type": "string" },
         "themesTitle": { "type": "string" },

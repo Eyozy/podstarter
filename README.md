@@ -1,37 +1,19 @@
-# 播客网站模板（示例：贤者时间）
+# PodStarter
 
-一个可复用的播客静态网站模板，默认示例为《贤者时间》。支持从小宇宙 RSS 自动同步节目、AI 智能内容管理，以及全文搜索。
+专为播客创作者打造的静态网站模板。它能直接从小宇宙 RSS 同步你的节目，不仅自带全局音频播放器和内容搜索功能，还能接入 AI，自动帮你提炼节目标签和分类。
 
-## 在线访问
+## 在线演示
 
-- **网站地址**: https://xzsj.netlify.app/
-- **RSS 订阅**: 见 `src/data/site.json` → `podcast.rssUrl`
+- **示例网站**: https://xzsj.netlify.app/
+- **默认 RSS 订阅**: 详见 `src/data/site.json` 中的 `podcast.rssUrl` 节点
 
-## 功能亮点
+## 核心功能
 
-- **自动同步** - 一键从小宇宙 RSS 获取最新节目
-- **AI 智能管理**（可选） - 自动为节目生成主题分类和标签，通过配置开关控制
-- **全文搜索** - 基于 Pagefind 的快速站内搜索
-- **全局播放器** - 吸底播放器，支持后台播放
-- **复古温馨风格** - 精心设计的视觉体验
-- **模板化配置** - 所有文案与链接集中在 `src/data/site.json`
-
-## 模板配置入口
-
-站点内容统一配置在 `src/data/site.json`，包括：
-
-- **功能开关** - `features.aiTagging`：是否启用 AI 标签/主题功能（默认关闭）
-- 品牌名/描述/OG 图
-- RSS 与平台订阅链接
-- 首页文案与按钮
-- 页面通用 UI 文案（播放/暂停/空状态）
-- 关于页成员/联系方式/反馈方式
-- 播放器/分享卡片文案（含文件名前缀）
-- 文字稿模板占位文案
-
-详细说明见 `docs/template-config.md`。
-
-> 目前仅支持小宇宙 RSS 链接。
+- **🚀 自动更新**：一条命令就能从小宇宙拉取最新节目，还能帮你把文字稿的骨架搭好。
+- **🧠 AI 自动打标（可选）**：根据节目摘要自动总结出合适的主题分类和内容标签。
+- **🔍 毫秒级搜索**：内置了轻量级的静态搜索引擎，方便快速查找内容。
+- **🎵 跨页面播放**：自带全局播放器，方便听众在网站内对照文字稿收听。
+- **🤖 搜索引擎与 AI 友好**：自动生成 `sitemap` 和 `llms.txt` 。
 
 ## 快速开始
 
@@ -57,6 +39,8 @@ npm install
 
 打开 `src/data/site.json`，替换为你的播客信息（RSS、品牌名、文案、成员等）。
 
+> **注意**：如果你后续更换了站点的域名，请务必同步修改 `public/llms.txt` 中的各个页面 URL，以及 `astro.config.mjs` 中的 `site` 配置，确保 AI 代理和搜索引擎能够正确爬取。
+
 ### 第四步：配置环境变量（可选）
 
 如果你需要使用 AI 智能打标功能：
@@ -73,7 +57,7 @@ npm install
 2. 在项目根目录创建 `.env` 文件，添加以下内容：
 
 ```bash
-# 选择提供商：deepseek | openrouter | xai | zhipu（必填）
+# 选择提供商：deepseek | openrouter | xai | zhipu | openai-compatible（必填）
 AI_PROVIDER=deepseek
 
 # DeepSeek（示例）
@@ -82,9 +66,19 @@ DEEPSEEK_API_URL=https://api.deepseek.com/v1/chat/completions
 DEEPSEEK_MODEL=deepseek-chat
 ```
 
-> **不需要 AI 功能？** 保持 `features.aiTagging: false`（默认值）即可，无需配置任何环境变量。网站的基础功能（同步、构建、预览）都能正常使用。
+如果你使用的是 OpenAI 兼容接口地址，也可以这样配置：
+
+```bash
+AI_PROVIDER=openai-compatible
+
+OPENAI_COMPATIBLE_API_KEY=sk-你的密钥
+OPENAI_COMPATIBLE_API_URL=https://your-host/v1/chat/completions
+OPENAI_COMPATIBLE_MODEL=你的模型名
+```
+
+> **不需要 AI 功能？** 将 `features.aiTagging` 设为 `false` 即可，无需配置任何环境变量。网站的基础功能（同步、构建、预览）都能正常使用。
 >
-> 其他提供商（OpenRouter / xAI / 智谱）的环境变量示例请参考 `.env.example`。
+> 其他提供商（OpenRouter / xAI / 智谱 / 通用 OpenAI 兼容）的环境变量示例请参考 `.env.example`。
 
 ### 第五步：获取节目数据
 
@@ -102,19 +96,27 @@ npm run dev
 
 打开浏览器访问 http://localhost:4321，就能看到网站了。
 
+## 搜索说明
+
+- 开发环境不会生成 `Pagefind` 索引，所以节目搜索会自动降级为标题与简介的原生字符匹配
+- `npm run build` 会生成 `dist/pagefind/`，生产环境自动启用全文检索和高亮摘要
+- 如果你本地查看构建产物，请使用静态文件服务器，例如 `python3 -m http.server 4321 -d dist`
+
 ## 常用命令
 
 | 命令                  | 说明                                           |
 | --------------------- | ---------------------------------------------- |
 | `npm run dev`         | 启动本地开发服务器                             |
 | `npm run build`       | 构建生产版本（包含搜索索引）                   |
-| `npm run preview`     | 预览构建后的网站                               |
-| `npm run fetch`       | 从 RSS 拉取最新节目数据                        |
+| `npm run test`        | 运行当前仓库内的 Node 原生单元测试             |
 | `npm run sync`        | 完整同步：拉取数据 + 生成文字稿模板 + 自动打标 |
 | `npm run reset`       | 重置所有播客数据（切换播客时使用）             |
 | `npm run tag`         | 为未分类的节目添加主题和标签（需要 API 密钥）  |
 | `npm run analyze`     | 重新分析所有节目，生成主题分类（慎用）         |
+| `npm run analyze:full`| 使用全部节目重建主题分类（更完整，也更贵）     |
 | `npm run smart-build` | 一键完成：同步数据 + 构建网站                  |
+
+> `@astrojs/netlify` 适配器不支持 `npm run preview`。如需预览构建产物，请直接对 `dist` 起静态文件服务。
 
 ## AI 内容管理
 
@@ -134,6 +136,20 @@ episodes.json（添加主题和标签）
 静态网站 + 搜索索引
 ```
 
+更准确地说，AI 部分分成两步：
+
+1. `npm run analyze` / `npm run analyze:full`
+作用：生成或重建 `src/data/themes.json`
+
+2. `npm run tag`
+作用：基于现有 `themes.json`，给 `src/data/episodes.json` 中的节目写入 `themeId` 和 `tags`
+
+而 `npm run sync` 是自动流程入口：
+- 同步 RSS 数据
+- 必要时自动生成 `themes.json`
+- 自动给新节目打标签
+- 生成文字稿模板
+
 ### 日常更新流程
 
 有新节目发布时，只需运行：
@@ -144,31 +160,138 @@ npm run smart-build
 
 这一条命令会自动完成数据同步和网站构建。
 
+### 常见 AI 命令场景
+
+**初始化 AI 分类体系**
+
+```bash
+npm run analyze
+npm run tag
+```
+
+适用场景：
+- 第一次给播客建立主题分类和标签体系
+- `themes.json` 还不存在
+
+**使用全部节目重建主题分类**
+
+```bash
+npm run analyze:full
+```
+
+适用场景：
+- 节目数量不算太大
+- 希望主题分类尽量基于全部节目内容
+
+注意：
+- 会覆盖现有 `src/data/themes.json`
+- 比默认的 `npm run analyze` 更慢、花费更高
+
+**日常同步新节目并自动打标**
+
+```bash
+npm run sync
+```
+
+适用场景：
+- 平时更新节目
+- 想自动完成“同步 + 必要时分析主题 + 给新节目打标签”
+
+**只给未打标节目补标签**
+
+```bash
+npm run tag
+```
+
+适用场景：
+- 已有 `themes.json`
+- 只想补 `themeId` 和 `tags`
+
+**批量处理更多未打标节目**
+
+```bash
+node scripts/tag-episodes.js --limit 20
+node scripts/tag-episodes.js --limit 100
+node scripts/tag-episodes.js --limit 9999
+```
+
+适用场景：
+- 默认 `npm run tag` 一次只处理 5 期
+- 你想一次性处理更多未打标节目
+
+**只重打指定节目**
+
+```bash
+node scripts/tag-episodes.js --ids 节目ID1,节目ID2
+```
+
+示例：
+
+```bash
+node scripts/tag-episodes.js --ids 6989f7eca22480add65e2fc5,685bbdcc50e8c269ca790278
+```
+
 ### 脚本详解
 
 **`npm run sync`**
 
-同步 RSS 数据，为新节目生成文字稿模板。如果配置了 API 密钥，还会自动为新节目打标。
+同步 RSS 数据，为新节目生成文字稿模板。
+
+如果启用了 AI 且配置有效，它还会自动：
+- 检查 `themes.json` 是否存在
+- 若不存在，先执行主题分析
+- 再对本次新增/更新的节目执行 AI 打标
 
 **`npm run tag`**
 
-检查所有未分类的节目，根据现有主题进行归类，并生成相关标签。建议在每次拉取新数据后运行。
+检查所有未分类的节目，根据现有 `themes.json` 进行归类，并生成相关标签。
+
+默认行为：
+- 一次只处理 5 期未打标节目
+
+可选参数：
+- `--limit N`：一次处理更多节目
+- `--ids id1,id2`：只处理指定节目
+
+示例：
+
+```bash
+node scripts/tag-episodes.js --limit 20
+node scripts/tag-episodes.js --ids 6989f7eca22480add65e2fc5
+```
 
 **`npm run analyze`**
 
-分析所有节目内容，重新生成主题分类体系。这会覆盖现有的 `themes.json`，建议仅在初始化或需要重构分类体系时使用。
+使用“均匀抽样模式”分析节目内容，重新生成主题分类体系。
+
+特点：
+- 默认抽样约 30 期节目，而不是把全部节目发给 AI
+- 会覆盖现有的 `themes.json`
+- 更适合初始化或日常重建分类体系
+
+**`npm run analyze:full`**
+
+使用全部节目摘要重建主题分类体系。
+
+特点：
+- 比 `npm run analyze` 更完整
+- 也更慢、更贵
+- 同样会覆盖现有的 `themes.json`
 
 ## 项目结构
 
 ```
 xzsj/
 ├── scripts/                   # 数据处理脚本
-│   ├── ai-client.js           # DeepSeek API 封装
-│   ├── analyze-themes.js      # AI 主题分析
-│   ├── fetch-rss.js           # RSS 数据抓取
+│   ├── ai-client.js           # AI 请求封装（支持多提供商 / OpenAI 兼容）
+│   ├── ai-provider-config.js  # AI 提供商配置解析
+│   ├── analyze-themes.js      # AI 主题分类生成
+│   ├── normalize-tags.js      # 标签规范化
 │   ├── reset-data.js          # 数据重置脚本
-│   ├── sync-content.js        # 内容同步
-│   └── tag-episodes.js        # AI 智能打标
+│   ├── site-config.js         # 读取 site.json 的共享脚本
+│   ├── sync-content.js        # 内容同步 + 自动 AI 流程入口
+│   ├── tag-episodes.js        # AI 节目归类与标签打标
+│   └── utils.js               # 脚本层共享工具函数
 ├── src/
 │   ├── components/            # UI 组件
 │   │   ├── EpisodeCard.astro  # 节目卡片
@@ -180,18 +303,13 @@ xzsj/
 │   │   └── themes.json        # 主题分类
 │   ├── layouts/               # 页面布局
 │   ├── pages/                 # 路由页面
-│   └── styles/                # 样式文件
-├── public/                    # 静态资源
+│   ├── styles/                # 样式文件
+│   └── utils/                 # 测试复用的纯函数工具
+├── public/                    # 静态资源（OG 图 / robots.txt / llms.txt）
+├── tests/                     # Node 原生测试
 ├── astro.config.mjs           # Astro 配置
 └── package.json
 ```
-
-## 技术栈
-
-- **[Astro](https://astro.build/)** - 静态网站生成框架
-- **[Tailwind CSS](https://tailwindcss.com/)** - 原子化 CSS 框架
-- **[Pagefind](https://pagefind.app/)** - 静态网站搜索引擎
-- **AI（可选）** - 支持多提供商：DeepSeek / OpenRouter / xAI / 智谱
 
 ## 部署
 
@@ -224,7 +342,7 @@ xzsj/
 
 **Q: 如何获取 AI API 密钥？**
 
-根据你选择的提供商去对应控制台创建 API Key（DeepSeek / OpenRouter / xAI / 智谱），并把 `AI_PROVIDER` 与对应的 `*_API_KEY/_API_URL/_MODEL` 配好即可。
+根据你选择的提供商去对应控制台创建 API Key（DeepSeek / OpenRouter / xAI / 智谱 / OpenAI 兼容接口），并把 `AI_PROVIDER` 与对应的 `*_API_KEY/_API_URL/_MODEL` 配好即可。
 
 **Q: 切换到新播客后，旧数据还在怎么办？**
 

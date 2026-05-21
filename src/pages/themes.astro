@@ -33,26 +33,26 @@ const themesWithCount = themes.map((theme) => ({
 <MainLayout title={site.pages.themes.title}>
   <div class="max-w-7xl mx-auto">
     <h1
-      class="text-3xl md:text-4xl font-bold mb-12 text-center tracking-tight text-[#2d2a26]"
+      class="text-3xl md:text-4xl font-bold mb-8 sm:mb-10 md:mb-12 tracking-tight text-[#2d2a26]"
     >
       <span class="relative inline-block">
         {site.pages.themes.headline}
         <span
-          class="absolute -bottom-3 left-1/2 -translate-x-1/2 w-12 h-1 bg-orange-700/20 rounded-full"
+          class="absolute -bottom-3 left-0 w-12 h-1 bg-orange-700/20 rounded-full"
         ></span>
       </span>
     </h1>
 
     <!-- 主题选择器 -->
-    <div class="flex flex-wrap justify-center gap-3 mb-12">
+    <div class="flex flex-wrap gap-2.5 sm:gap-3 mb-8 sm:mb-10 md:mb-12">
       {
         themesWithCount.map((theme, index) => (
           <button
             class:list={[
-              "theme-tab px-4 py-2 md:px-6 md:py-3 rounded-full font-serif text-sm md:text-base transition-all duration-300 border",
+              "theme-tab px-3.5 py-2 sm:px-4 md:px-6 md:py-3 rounded-full font-serif text-sm md:text-base transition-all duration-300 border shadow-sm",
               index === 0
-                ? "bg-[#2d2a26] text-white border-[#2d2a26]"
-                : "bg-white text-[#2d2a26] border-[#2d2a26]/10 hover:border-[#2d2a26]/30",
+                ? "bg-[#2d2a26] text-white border-[#2d2a26] hover:bg-[#2d2a26] hover:text-white shadow-[0_10px_20px_-16px_rgba(0,0,0,0.45)]"
+                : "bg-white text-[#2d2a26] border-[#2d2a26]/10 hover:text-[#2d2a26] hover:border-[#2d2a26]/30 hover:bg-white/90",
             ]}
             data-theme-id={theme.id}
           >
@@ -64,24 +64,24 @@ const themesWithCount = themes.map((theme) => ({
     </div>
 
     <!-- 主题描述 -->
-    <div class="mb-10 text-center">
+    <div class="mb-8 sm:mb-10">
       {
         themes.map((theme, index) => (
           <div
             class:list={[
-              "theme-description transition-all duration-300",
+              "theme-description transition-all duration-300 py-1",
               index === 0 ? "block" : "hidden",
             ]}
             data-theme-desc={theme.id}
           >
-            <p class="text-lg font-serif opacity-60 max-w-2xl mx-auto leading-relaxed mb-4">
+            <p class="text-base sm:text-lg font-serif opacity-60 leading-relaxed mb-4 max-w-none">
               {theme.description}
             </p>
             {theme.representativeTags &&
               theme.representativeTags.length > 0 && (
-                <div class="flex flex-wrap justify-center gap-2">
+                <div class="flex flex-wrap gap-2">
                   {theme.representativeTags.map((tag) => (
-                    <span class="text-xs font-serif px-3 py-1 bg-[#2d2a26]/5 text-[#2d2a26]/60 rounded-full">
+                    <span class="text-xs font-serif px-3 py-1 bg-[#2d2a26]/5 text-[#2d2a26]/60 rounded-full border border-[#2d2a26]/5">
                       #{tag}
                     </span>
                   ))}
@@ -112,7 +112,7 @@ const themesWithCount = themes.map((theme) => ({
                 ))}
               </div>
             ) : (
-              <div class="bg-white/50 border border-[#2d2a26]/5 border-dashed rounded-xl p-12 text-center">
+              <div class="bg-white/50 border border-[#2d2a26]/5 border-dashed rounded-xl p-8 sm:p-10 md:p-12 text-center">
                 <p class="text-lg opacity-40 font-serif">{site.pages.themes.emptyLabel}</p>
               </div>
             )}
@@ -130,8 +130,22 @@ const themesWithCount = themes.map((theme) => ({
     const episodeLists = document.querySelectorAll(".theme-episodes");
 
     // 样式常量
-    const ACTIVE_TAB = ["bg-[#2d2a26]", "text-white", "border-[#2d2a26]"];
-    const INACTIVE_TAB = ["bg-white", "text-[#2d2a26]", "border-[#2d2a26]/10"];
+    const ACTIVE_TAB = [
+      "bg-[#2d2a26]",
+      "text-white",
+      "border-[#2d2a26]",
+      "hover:bg-[#2d2a26]",
+      "hover:text-white",
+      "shadow-[0_10px_20px_-16px_rgba(0,0,0,0.45)]",
+    ];
+    const INACTIVE_TAB = [
+      "bg-white",
+      "text-[#2d2a26]",
+      "border-[#2d2a26]/10",
+      "hover:text-[#2d2a26]",
+      "hover:border-[#2d2a26]/30",
+      "hover:bg-white/90",
+    ];
 
     // 辅助函数：根据 data 属性切换元素显示
     function showByAttribute(

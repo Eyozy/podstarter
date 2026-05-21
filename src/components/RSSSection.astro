@@ -1,18 +1,26 @@
 ---
 // 订阅平台链接与二维码都在 site.json 中维护。
 import site from "../data/site.json";
+
+const xiaoyuzhouLogoPath =
+  "M177.21 60.22c-.38 2.18-1.32 4.46-2.53 6.69-2.43 4.51-6.48 9.86-11.63 15.67-10.37 11.67-25.9 25.92-44.12 40.04-18.22 14.12-35.88 25.59-49.75 32.71-6.91 3.54-13.09 6.12-18.04 7.34-2.46.61-4.9.95-7.1.77-2.19-.19-4.79-.97-6.56-3.27-1.25-1.62-1.54-3.47-1.48-4.99.06-1.49.46-2.95.96-4.26 1.01-2.61 2.76-5.54 4.85-8.53 3.69-5.25 8.95-11.41 14.8-17.64-1.76-5.31-2.71-10.99-2.71-16.89 0-29.65 23.96-53.69 53.5-53.69 10.44 0 20.17 3 28.4 8.18 8.89-5.1 16.86-8.9 23.15-10.93 3.18-1.02 6.21-1.68 8.86-1.7 2.53-.02 5.8.56 7.91 3.31 1.77 2.29 1.87 5.02 1.49 7.19Zm-9.36-1.09c-1.29.02-3.28.37-6.03 1.26-4.67 1.5-10.78 4.28-17.93 8.21q2.75 2.57 5.12 5.5c-9.54 10.36-23.45 23.01-39.92 35.77-16.55 12.83-32.35 23.18-44.77 29.83q-1.96-2.67-3.59-5.57c-4.54 4.99-8.45 9.7-11.24 13.68-1.83 2.61-3.04 4.71-3.67 6.24.76-.05 1.78-.2 3.08-.53 3.93-.96 9.36-3.16 16.01-6.57 13.22-6.78 30.38-17.91 48.29-31.78 17.9-13.88 32.96-27.74 42.84-38.86 4.97-5.59 8.46-10.31 10.39-13.88.77-1.44 1.21-2.53 1.42-3.3Z";
+const xiaoyuzhouLogoSubPath =
+  "M122.75 127.62c-14.23 11.03-28.21 20.53-40.43 27.67 7.48 4 16.02 6.26 25.08 6.26 29.55 0 53.5-24.04 53.5-53.69 0-4.24-.49-8.37-1.42-12.34-9.95 10.03-22.57 21.13-36.73 32.1Z";
 ---
 
-<section
-  class="mb-20 sm:mb-24 bg-white/40 border border-[#2d2a26]/5 p-6 sm:p-8 md:p-12 relative overflow-hidden rounded-2xl"
->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+<section class="mb-12 sm:mb-14 bg-white/45 border border-[#2d2a26]/5 p-5 sm:p-8 md:p-10 relative overflow-hidden rounded-2xl">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center">
     <div class="space-y-5 sm:space-y-6">
-      <h2 class="text-2xl sm:text-3xl font-bold">{site.sections.rssTitle}</h2>
-      <p class="text-sm opacity-60 leading-relaxed font-serif max-w-sm">
+      <div class="space-y-2">
+        <p class="text-[10px] sm:text-[11px] font-serif font-bold uppercase tracking-[0.22em] text-orange-900/80">
+          Connect
+        </p>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">{site.sections.rssTitle}</h2>
+      </div>
+      <p class="text-sm md:text-base text-[#6f685f] leading-relaxed font-serif max-w-md">
         {site.sections.rssDescription}
       </p>
-      <div class="flex flex-wrap gap-4 sm:gap-6 pt-3 sm:pt-4">
+      <div class="flex flex-wrap gap-3 sm:gap-6 pt-2 sm:pt-3">
         <a
           href={site.podcast.appleUrl}
           target="_blank"
@@ -54,42 +62,69 @@ import site from "../data/site.json";
           rel="noopener noreferrer"
           class="flex items-center gap-2 text-xs font-serif font-bold uppercase tracking-widest hover:text-orange-700 transition-colors"
         >
+          <svg
+            viewBox="0 0 214 214"
+            class="size-4 sm:size-5"
+            aria-hidden="true"
+            fill="none"
+          >
+            <path d={xiaoyuzhouLogoPath} fill="#231f20"></path>
+            <path d={xiaoyuzhouLogoSubPath} fill="#231f20"></path>
+          </svg>
           <span>{site.sections.rssLabels.xiaoyuzhou}</span>
         </a>
       </div>
     </div>
 
     <div class="relative flex justify-center md:justify-end">
-      <div class="flex flex-wrap justify-center md:justify-end gap-4 sm:gap-6">
-        <div class="text-center">
+      <div class="flex w-full max-w-sm md:max-w-none flex-nowrap justify-center md:justify-end gap-3 sm:gap-4">
+        <div class="text-center flex-1 min-w-0 max-w-44">
           <div
-            class="bg-white p-3 sm:p-4 shadow-sm border border-[#2d2a26]/5 w-[clamp(120px,44vw,160px)] rounded-2xl"
+            class="w-full rounded-2xl border border-[#2d2a26]/5 bg-white/80 p-3 sm:p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.32)] backdrop-blur-sm"
           >
+            <div class="mb-3 flex items-center justify-center gap-2 text-[#2d2a26]">
+              <svg viewBox="0 0 214 214" class="size-4" aria-hidden="true" fill="none">
+                <path d={xiaoyuzhouLogoPath} fill="#231f20"></path>
+                <path d={xiaoyuzhouLogoSubPath} fill="#231f20"></path>
+              </svg>
+              <p class="text-[11px] font-serif font-bold uppercase tracking-[0.2em] text-[#5f584f]">
+                {site.sections.rssLabels.xiaoyuzhou}
+              </p>
+            </div>
             <div
-              class="aspect-square bg-[#f0ede8] mb-3 flex items-center justify-center border border-[#2d2a26]/5 bg-cover bg-center rounded-lg"
+              class="aspect-square mb-3 flex items-center justify-center bg-white bg-cover bg-center rounded-xl overflow-hidden p-2"
               style={`background-image: url('${site.podcast.xiaoyuzhouQr}')`}
             >
             </div>
             <p
-              class="text-[10px] font-serif opacity-40 uppercase tracking-widest font-bold"
+              class="text-[10px] font-serif text-[#726a61] uppercase tracking-[0.2em] font-bold"
             >
-              {site.sections.rssLabels.xiaoyuzhou}
+              扫码收听
             </p>
           </div>
         </div>
-        <div class="text-center">
+        <div class="text-center flex-1 min-w-0 max-w-44">
           <div
-            class="bg-white p-3 sm:p-4 shadow-sm border border-[#2d2a26]/5 w-[clamp(120px,44vw,160px)] rounded-2xl"
+            class="w-full rounded-2xl border border-[#2d2a26]/5 bg-white/80 p-3 sm:p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.32)] backdrop-blur-sm"
           >
+            <div class="mb-3 flex items-center justify-center gap-2 text-[#2d2a26]">
+              <svg viewBox="0 0 1024 1024" class="size-4" fill="currentColor">
+                <path d="M682.666667 362.666667C682.666667 225.28 554.666667 114.346667 396.8 114.346667c-157.866667 0-285.866667 110.933333-285.866667 248.32 0 76.8 39.253333 145.066667 101.12 191.573333l-26.453333 80.64 87.893333-43.946667c37.546667 10.666667 78.506667 17.066667 123.306667 17.066667 18.773333 0 37.12-1.28 55.04-3.84-2.56-11.52-3.84-23.466667-3.84-35.84 0-149.333333 133.546667-270.506667 298.666667-270.506667 11.946667 0 24.32 0.853333 35.84 2.56z m-165.12-62.72c20.48 0 37.12 16.64 37.12 37.12s-16.64 37.12-37.12 37.12-37.12-16.64-37.12-37.12 16.64-37.12 37.12-37.12z m-222.72 0c20.48 0 37.12 16.64 37.12 37.12s-16.64 37.12-37.12 37.12-37.12-16.64-37.12-37.12 16.64-37.12 37.12-37.12z" />
+                <path d="M1024 645.12c0-117.76-110.933333-213.333333-248.32-213.333333-137.386667 0-248.32 95.573333-248.32 213.333333 0 117.76 110.933333 213.333333 248.32 213.333333 34.56 0 67.413333-6.4 96.853333-17.066667l67.84 34.133333-20.48-62.293333c48.213333-40.106667 79.36-93.866667 79.36-151.04z m-338.346667-34.133333c-15.36 0-27.733333-12.373333-27.733333-27.733333s12.373333-27.733333 27.733333-27.733333 27.733333 12.373333 27.733333 27.733333-12.373333 27.733333-27.733333 27.733333z m181.333334 0c-15.36 0-27.733333-12.373333-27.733333-27.733333s12.373333-27.733333 27.733333-27.733333 27.733333 12.373333 27.733333 27.733333-12.373333 27.733333-27.733333 27.733333z" />
+              </svg>
+              <p class="text-[11px] font-serif font-bold uppercase tracking-[0.2em] text-[#5f584f]">
+                {site.sections.rssLabels.wechat}
+              </p>
+            </div>
             <div
-              class="aspect-square bg-[#f0ede8] mb-3 flex items-center justify-center border border-[#2d2a26]/5 bg-cover bg-center rounded-lg"
+              class="aspect-square mb-3 flex items-center justify-center bg-white bg-cover bg-center rounded-xl overflow-hidden p-2"
               style={`background-image: url('${site.podcast.wechatQr}')`}
             >
             </div>
             <p
-              class="text-[10px] font-serif opacity-40 uppercase tracking-widest font-bold"
+              class="text-[10px] font-serif text-[#726a61] uppercase tracking-[0.2em] font-bold"
             >
-              {site.sections.rssLabels.wechat}
+              扫码关注
             </p>
           </div>
         </div>

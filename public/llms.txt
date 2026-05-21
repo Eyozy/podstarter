@@ -1,0 +1,23 @@
+# 贤者时间
+
+> 一档从普通人视角观察其他普通人的播客节目。
+
+## Site Map
+
+- [首页](https://xzsj.netlify.app/): 最新节目、近期更新和订阅入口
+- [全部节目](https://xzsj.netlify.app/episodes): 支持年份筛选与关键词搜索（含全文检索文字稿）
+- [单集详情](https://xzsj.netlify.app/episodes/{id}): 节目介绍、时间戳导航与文字稿
+- [主题探索](https://xzsj.netlify.app/themes): AI 生成的主题分类（需开启 AI 功能，否则返回 404）
+- [关于我们](https://xzsj.netlify.app/about): 节目介绍、成员信息与联系方式
+
+## Content Notes
+
+- 节目信息来自小宇宙 RSS 定时同步，每日自动更新
+- 文字稿可在单集详情页查看，由播客团队手动整理
+- 主题与标签由 AI 辅助生成（需在站点配置中启用 AI 功能）
+
+## Preferred Reading Paths
+
+- 想快速了解节目：先看 [首页](https://xzsj.netlify.app/) 和 [关于我们](https://xzsj.netlify.app/about)
+- 想系统浏览往期：访问 [全部节目](https://xzsj.netlify.app/episodes)
+- 想按主题探索：访问 [主题探索](https://xzsj.netlify.app/themes)

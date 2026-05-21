@@ -1,1 +1,57 @@
-[]
+[
+  {
+    "id": "gender_reality",
+    "title": "她者处境",
+    "description": "从女性日常经验出发，讨论性别规训如何渗入工作、关系、表达与自我认知之中。",
+    "representativeTags": [
+      "女性处境",
+      "权力关系",
+      "身体经验",
+      "身份焦虑"
+    ]
+  },
+  {
+    "id": "work_and_survival",
+    "title": "谋生之道",
+    "description": "聚焦普通人在职业世界里的周旋、试探与自保，拆解职场规则背后的现实逻辑。",
+    "representativeTags": [
+      "职场生存",
+      "普通人生活",
+      "权力关系",
+      "身份焦虑"
+    ]
+  },
+  {
+    "id": "intimate_boundaries",
+    "title": "关系练习",
+    "description": "围绕爱情、友情与相处尺度，辨认亲密渴望、边界冲突与情感中的隐秘拉扯。",
+    "representativeTags": [
+      "亲密关系",
+      "友情边界",
+      "婚恋观念",
+      "孤独社交"
+    ]
+  },
+  {
+    "id": "inner_growth",
+    "title": "内心风景",
+    "description": "关注个体如何与脆弱、内耗和不确定共处，并在反复体察中缓慢长出自我。",
+    "representativeTags": [
+      "自我成长",
+      "情绪内耗",
+      "身份焦虑",
+      "孤独社交"
+    ]
+  },
+  {
+    "id": "daily_aesthetics",
+    "title": "俗常有光",
+    "description": "从文艺作品与生活细部里打捞趣味、记忆和感受，呈现普通人世界中的微小光亮。",
+    "representativeTags": [
+      "普通人生活",
+      "生活趣味",
+      "文艺作品",
+      "身体经验"
+    ]
+  }
+]

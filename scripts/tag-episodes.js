@@ -2,7 +2,26 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { askAI } from "./ai-client.js";
-import { isAiEnabled } from "./site-config.js";
+import { isAiEnabled, loadSiteConfig } from "./site-config.js";
+import { normalizeTags, fillTags } from "./utils.js";
+
+// 用途：
+// 1. 读取现有的 src/data/themes.json
+// 2. 让 AI 为单集节目选择 themeId，并生成 2-3 个标签
+// 3. 回写到 src/data/episodes.json
+//
+// 对应命令：
+// - npm run tag
+//   默认一次只处理 5 期未打标节目
+// - node scripts/tag-episodes.js --limit 20
+//   一次处理更多未打标节目
+// - node scripts/tag-episodes.js --ids id1,id2
+//   只处理指定节目
+//
+// 注意：
+// - 这个脚本依赖已存在的 themes.json 和 tag-taxonomy.json
+// - 这个脚本负责“给节目写入 themeId / tags”
+// - 不负责生成主题分类体系
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,8 +31,11 @@ const EPISODES_PATH = path.join(DATA_DIR, "episodes.json");
 const THEMES_PATH = path.join(DATA_DIR, "themes.json");
 const TAG_TAXONOMY_PATH = path.join(DATA_DIR, "tag-taxonomy.json");
 
+// 每次运行默认只处理 5 期节目，防止一次性调用 AI 过多导致费用过高或被限流。
+// 如需一次性处理所有未打标节目，请运行：node scripts/tag-episodes.js --limit 9999
 const DEFAULT_LIMIT = 5;
 const MAX_CONTENT_CHARS = 800;
+// 每次 AI 请求之间的间隔（毫秒），避免触发 API 限流
 const REQUEST_DELAY_MS = 1500;
 
 const { limit, ids } = parseArgs(process.argv.slice(2));
@@ -39,7 +61,7 @@ function parseArgs(args) {
       i += 1;
       continue;
     }
-    if (/^\\d+$/.test(arg)) {
+    if (/^\d+$/.test(arg)) {
       parsed.limit = parseInt(arg, 10);
     }
   }
@@ -60,48 +82,7 @@ function writeEpisodes(episodes) {
   fs.writeFileSync(EPISODES_PATH, JSON.stringify(episodes, null, 2));
 }
 
-function normalizeTags(rawTags, aliases, allowedTags) {
-  if (!Array.isArray(rawTags)) {
-    return [];
-  }
-
-  const normalized = [];
-  for (const rawTag of rawTags) {
-    if (rawTag === null || rawTag === undefined) {
-      continue;
-    }
-    const trimmed = String(rawTag).trim();
-    if (!trimmed) {
-      continue;
-    }
-    const mapped = aliases[trimmed] || trimmed;
-    if (!allowedTags.has(mapped)) {
-      continue;
-    }
-    if (!normalized.includes(mapped)) {
-      normalized.push(mapped);
-    }
-  }
-  return normalized;
-}
-
-function fillTags(primaryTags, fallbackTags, minCount, maxCount) {
-  const tags = [...primaryTags];
-  for (const tag of fallbackTags) {
-    if (tags.length >= maxCount) {
-      break;
-    }
-    if (!tags.includes(tag)) {
-      tags.push(tag);
-    }
-  }
-
-  if (tags.length > maxCount) {
-    return tags.slice(0, maxCount);
-  }
-
-  return tags.length >= minCount ? tags : tags.slice(0, Math.max(minCount, 1));
-}
+// normalizeTags 和 fillTags 已提取到 scripts/utils.js，从那里统一导入。
 
 function truncateContent(content) {
   if (!content) return "";
@@ -118,36 +99,38 @@ function getUntaggedEpisodes(episodes, validThemeIds) {
   });
 }
 
-function buildPrompt(episode, themes, allowedTags) {
+function buildPrompt(episode, themes, allowedTags, podcastName) {
   const content = episode.contentSnippet || episode.content || "";
   const truncatedContent = truncateContent(content);
 
-  return `
-I need to classify a podcast episode into one of the following themes:
+  // 提示词使用中文，与节目内容语言一致，避免语言切换导致的语义偏差
+  // podcastName 从 site.json 动态读取，模板用户换播客后无需修改此脚本
+  return `你正在为《${podcastName}》播客的一期节目进行主题归类和标签打标。
 
+【可选主题列表】
 ${themes
-  .map(
-    (t) => `- ID: ${t.id}\n  Title: ${t.title}\n  Description: ${t.description}`,
-  )
-  .join("\n")}
+    .map(
+      (t) => `- ID: ${t.id}\n  标题: ${t.title}\n  说明: ${t.description}`,
+    )
+    .join("\n")}
 
-Episode Title: ${episode.title}
-Episode Content: ${truncatedContent}
+【本期节目信息】
+标题：${episode.title}
+内容摘要：${truncatedContent}
 
-Task:
-1. Select exactly ONE theme ID from the list above that best fits this episode.
-2. Select 2-3 relevant tags (keywords) for this episode in Simplified Chinese.
-3. Tags MUST be selected only from the allowed list below. Do not invent new tags.
+【任务】
+1. 从上方"可选主题列表"中选出最符合本期节目内容的主题，填入 themeId（必须是列表中已有的 ID，不可自造）
+2. 从下方"可选标签列表"中选出 2-3 个最贴合本期节目的标签，填入 tags（必须从列表中选取，不可自造新标签）
 
-Allowed Tags:
+【可选标签列表】
 ${Array.from(allowedTags)
-  .map((tag) => `- ${tag}`)
-  .join("\n")}
+    .map((tag) => `- ${tag}`)
+    .join("\n")}
 
-Return JSON:
+返回 JSON（只返回 JSON，不要其他内容）：
 {
-  "themeId": "theme_id_here",
-  "tags": ["tag1", "tag2", "tag3"]
+  "themeId": "主题 ID",
+  "tags": ["标签 1", "标签 2"]
 }
 `;
 }
@@ -159,6 +142,10 @@ async function tagEpisodes() {
     console.log("   如需使用此功能，请在 site.json 中设置 features.aiTagging: true");
     process.exit(1);
   }
+
+  // 从 site.json 动态读取播客名称，模板用户换播客后无需修改脚本
+  const siteConfig = loadSiteConfig();
+  const podcastName = siteConfig?.brand?.name || "该播客";
 
   const themes = readJson(THEMES_PATH, "Themes");
   const taxonomy = readJson(TAG_TAXONOMY_PATH, "Tag taxonomy");
@@ -207,12 +194,12 @@ async function tagEpisodes() {
   for (const episode of episodesToProcess) {
     console.log(`Tagging [${episode.id}]: ${episode.title}...`);
 
-    const prompt = buildPrompt(episode, themes, allowedTags);
+    const prompt = buildPrompt(episode, themes, allowedTags, podcastName);
 
     try {
       const result = await askAI(
         prompt,
-        "You are a content classifier for a Chinese podcast. Output valid JSON only.",
+        `你是《${podcastName}》播客的内容分类助手。请严格按照给定的主题和标签列表进行归类，只返回合法的 JSON，不要输出任何其他内容。`,
         { temperature: 0.2 },
       );
 
