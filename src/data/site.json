@@ -187,18 +187,9 @@
     "feedback": {
       "title": "网站反馈",
       "description": "如果你对网站有任何建议或想法，欢迎通过以下方式反馈：",
-      "channels": [
-        {
-          "title": "发送邮件",
-          "label": "Eyoz@duck.com",
-          "url": "mailto:Eyoz@duck.com"
-        },
-        {
-          "title": "即刻",
-          "label": "任一帖子下留言",
-          "url": "https://m.okjike.com/users/d76ab460-d37a-4d7c-a6ce-faff549411b2"
-        }
-      ]
+      "formUrl": "https://alarkusw9gaaqdgm.usttp.larksuite.com/share/base/form/shrutNPtDNruGWkwTGgsJHFcM0g",
+      "formButtonText": "填写反馈表单",
+      "channels": []
     }
   },
   "footer": {

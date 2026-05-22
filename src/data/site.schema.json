@@ -357,6 +357,8 @@
           "properties": {
             "title": { "type": "string" },
             "description": { "type": "string" },
+            "formUrl": { "type": "string" },
+            "formButtonText": { "type": "string" },
             "channels": {
               "type": "array",
               "items": {
