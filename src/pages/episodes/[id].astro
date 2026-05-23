@@ -57,9 +57,7 @@ try {
 
     // 判断是否是占位符
     isTranscriptPlaceholder =
-      rawMarkdown.includes("暂未提供文字稿") ||
-      rawMarkdown.includes("通义听悟") ||
-      rawMarkdown.includes("NotebookLM");
+      rawMarkdown.includes("暂未提供文字稿");
   }
 } catch (e) {
   console.log(`No transcript found for episode ${episode.id}`);
@@ -79,7 +77,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
 <MainLayout title={episode.title}>
   <article class="max-w-6xl mx-auto w-full" data-episode-page>
     <!-- Breadcrumbs -->
-    <nav class="mb-6 sm:mb-8 md:mb-12 font-serif text-xs sm:text-sm opacity-50 break-words">
+    <nav class="mb-6 sm:mb-8 md:mb-12 font-serif text-xs sm:text-sm opacity-50">
       <a href="/episodes" class="hover:text-orange-800 transition-colors"
         >{site.pages.episodeDetail.breadcrumbListLabel}</a
       >
@@ -460,11 +458,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     // 客户端双重保障：检测文字稿正文是否包含占位符关键字
     const isPlaceholder = () => {
       const bodyText = window.episodeData.transcript.body || "";
-      return (
-        bodyText.includes("暂未提供文字稿") ||
-        bodyText.includes("通义听悟") ||
-        bodyText.includes("NotebookLM")
-      );
+      return bodyText.includes("暂未提供文字稿");
     };
 
     if (isPlaceholder()) {
