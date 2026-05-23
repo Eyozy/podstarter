@@ -346,11 +346,11 @@ function normalizeEpisode(item, index) {
 
   return {
     id: extractEpisodeId(item, index),
-    title: item.title || "",
+    title: autocorrect(item.title || ""),
     link: item.link || "",
     pubDate: item.pubDate || "",
-    content: sanitizedContent,
-    contentSnippet: item.contentSnippet || "",
+    content: autocorrect(sanitizedContent),
+    contentSnippet: autocorrect(item.contentSnippet || ""),
     enclosure: item.enclosure,
     itunes: item.itunes || {},
   };
@@ -526,17 +526,9 @@ async function syncContent() {
     mergedEpisodes.push(...orphaned);
   }
 
-  // 对 mergedEpisodes 文本字段做中英文混排加空格排版优化
-  const formattedEpisodes = mergedEpisodes.map((ep) => ({
-    ...ep,
-    title: autocorrect(ep.title),
-    contentSnippet: autocorrect(ep.contentSnippet),
-    content: autocorrect(ep.content),
-  }));
+  writeEpisodes(mergedEpisodes);
 
-  writeEpisodes(formattedEpisodes);
-
-  const episodesById = new Map(formattedEpisodes.map((ep) => [ep.id, ep]));
+  const episodesById = new Map(mergedEpisodes.map((ep) => [ep.id, ep]));
   let transcriptCount = 0;
   if (!options.skipTranscripts) {
     transcriptCount = ensureTranscriptFiles(episodesById, updatedIds);
@@ -559,7 +551,7 @@ async function syncContent() {
   }
 
   // 生成文字稿目录索引，方便在 VS Code 中快速查找对应文件
-  generateTranscriptIndex(formattedEpisodes);
+  generateTranscriptIndex(mergedEpisodes);
 
   console.log(`Episodes fetched: ${incomingEpisodes.length}`);
   console.log(`New episodes: ${newIds.length}`);
@@ -610,8 +602,20 @@ function generateTranscriptIndex(episodes) {
     day: "2-digit",
   }).replace(/\//g, "-");
 
-  // 加 frontmatter 满足 Astro transcripts collection 的 schema（字段均可选）
-  const indexContent = [
+  const indexPath = path.join(TRANSCRIPTS_DIR, "_index.md");
+  let oldDate = now;
+  let oldContentWithoutDate = "";
+
+  if (fs.existsSync(indexPath)) {
+    const oldFileContent = fs.readFileSync(indexPath, "utf-8");
+    const dateMatch = oldFileContent.match(/> 📅 \*\*最后更新时间\*\*：([^\n]+)/);
+    if (dateMatch) {
+      oldDate = dateMatch[1];
+    }
+    oldContentWithoutDate = oldFileContent.replace(/> 📅 \*\*最后更新时间\*\*：[^\n]+\n/, "");
+  }
+
+  const generateContent = (dateStr) => [
     `---`,
     `title: "文字稿目录索引（自动生成）"`,
     `contributors: []`,
@@ -620,7 +624,7 @@ function generateTranscriptIndex(episodes) {
     `# 文字稿目录索引`,
     ``,
     `> 💡 **自动更新提示**：此文件由 \`sync-content.js\` 自动生成，请勿手动编辑。`,
-    `> 📅 **最后更新时间**：${now}`,
+    `> 📅 **最后更新时间**：${dateStr}`,
     `> 📊 **统计数据**：共 **${sorted.length}** 期节目 | 🟢 完整 **${totalComplete}** 期 | 🟡 待补充 **${totalPlaceholder}** 期` + (totalMissing > 0 ? ` | 🔴 缺失 **${totalMissing}** 期` : ""),
     ``,
     `提示：在支持 Markdown 预览或链接跳转的编辑器（如 VS Code）中，按住 \`Ctrl\`（Mac 用户按住 \`Cmd\` ⌘）点击下表中的**节目标题**，即可直接打开并编辑对应的文字稿文件。`,
@@ -630,7 +634,14 @@ function generateTranscriptIndex(episodes) {
     ...rows,
   ].join("\n");
 
-  const indexPath = path.join(TRANSCRIPTS_DIR, "_index.md");
+  const newContentWithoutDate = generateContent(oldDate).replace(/> 📅 \*\*最后更新时间\*\*：[^\n]+\n/, "");
+
+  if (oldContentWithoutDate === newContentWithoutDate && fs.existsSync(indexPath)) {
+    console.log(`✓ 文字稿目录索引无变化，跳过更新`);
+    return;
+  }
+
+  const indexContent = generateContent(now);
   fs.writeFileSync(indexPath, indexContent, "utf-8");
   console.log(`✓ 已生成文字稿目录索引 → _index.md（${sorted.length} 期）`);
 }
