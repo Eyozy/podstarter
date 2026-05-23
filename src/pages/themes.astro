@@ -32,16 +32,16 @@ const themesWithCount = themes.map((theme) => ({
 
 <MainLayout title={site.pages.themes.title}>
   <div class="max-w-7xl mx-auto">
-    <h1
-      class="text-3xl md:text-4xl font-bold mb-8 sm:mb-10 md:mb-12 tracking-tight text-[#2d2a26]"
-    >
-      <span class="relative inline-block">
+    <div class="mb-8 sm:mb-10 md:mb-12">
+      <p class="text-[10px] md:text-[11px] font-serif font-bold uppercase tracking-[0.24em] text-orange-800/60 mb-3">
+        Themes
+      </p>
+      <h1
+        class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-[#2d2a26] mb-4 md:mb-6"
+      >
         {site.pages.themes.headline}
-        <span
-          class="absolute -bottom-3 left-0 w-12 h-1 bg-orange-700/20 rounded-full"
-        ></span>
-      </span>
-    </h1>
+      </h1>
+    </div>
 
     <!-- 主题选择器 -->
     <div class="flex flex-wrap gap-2.5 sm:gap-3 mb-8 sm:mb-10 md:mb-12">
