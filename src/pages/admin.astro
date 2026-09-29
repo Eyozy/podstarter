@@ -94,13 +94,18 @@ try {
 }
 
 let currentCommitSha = String(process.env.COMMIT_REF || process.env.COMMIT_SHA || "").trim();
-if (!currentCommitSha) {
-  try {
-    const { execSync } = await import("node:child_process");
-    currentCommitSha = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
-  } catch {
-    currentCommitSha = "";
+let localCommitList: string[] = [];
+try {
+  const { execSync } = await import("node:child_process");
+  localCommitList = execSync("git log -n 50 --format=%h", { encoding: "utf-8" })
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!currentCommitSha && localCommitList.length > 0) {
+    currentCommitSha = localCommitList[0];
   }
+} catch {
+  localCommitList = [];
 }
 const shortCommitSha = currentCommitSha.slice(0, 7);
 const currentVersion = "1.1.0";
@@ -1447,7 +1452,7 @@ const pageTitle = "管理控制台 | " + site.brand.name;
   </div>
 </MainLayout>
 
-<script is:inline define:vars={{ initialMembers: site.about?.members || [], initialVersion: currentVersion, currentCommitSha: shortCommitSha, envTemplates }}>
+<script is:inline define:vars={{ initialMembers: site.about?.members || [], initialVersion: currentVersion, currentCommitSha: shortCommitSha, localCommitList, envTemplates }}>
   function initAdminConsole() {
     const consoleRoot = document.querySelector("[data-admin-console]");
     if (!consoleRoot || consoleRoot.dataset.bound === "true") return;
@@ -1487,7 +1492,8 @@ const pageTitle = "管理控制台 | " + site.brand.name;
           if (data && data.sha) {
             const upstreamSha = String(data.sha).slice(0, 7);
             const upstreamMsg = data.commit?.message?.split("\n")[0] || "";
-            if (currentCommitSha && upstreamSha && !currentCommitSha.startsWith(upstreamSha) && !upstreamSha.startsWith(currentCommitSha)) {
+            const isAlreadySynced = Array.isArray(localCommitList) && localCommitList.includes(upstreamSha);
+            if (!isAlreadySynced && upstreamSha) {
               const banner = document.getElementById("upstream-version-banner");
               const title = document.getElementById("upstream-version-title");
               const desc = document.getElementById("upstream-version-desc");
@@ -1495,7 +1501,7 @@ const pageTitle = "管理控制台 | " + site.brand.name;
               if (banner && title) {
                 title.innerHTML = `检测到 PodStarter 模板有新更新：<code class="px-1.5 py-0.5 rounded bg-orange-100 font-mono text-[11px] text-orange-950 font-bold">${escapeAttr(upstreamMsg)}</code>`;
                 if (desc) {
-                  desc.textContent = `上游最新提交 (${upstreamSha}) 领先于当前版本 (${currentCommitSha})。可在私有仓库 Actions 运行 Upstream Sync 同步。`;
+                  desc.textContent = `上游最新提交 (${upstreamSha}) 尚未合并到当前站点。可在私有仓库 Actions 运行 Upstream Sync 同步。`;
                 }
                 if (link && data.html_url) {
                   link.href = data.html_url;
