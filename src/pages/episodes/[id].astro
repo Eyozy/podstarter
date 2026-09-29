@@ -1,82 +1,72 @@
 ---
 import MainLayout from "../../layouts/MainLayout.astro";
-import episodes from "../../data/episodes.json";
+import { publishedEpisodes, formatEpisodeDate, extractEpisodeNumber } from "../../utils/episodes";
 import { getEntry } from "astro:content";
 import DOMPurify from "isomorphic-dompurify";
-import fs from "node:fs";
-import path from "node:path";
-// 详情页文案在 site.json 的 pages.episodeDetail 中配置。
-import site from "../../data/site.json";
+import { loadSiteConfig } from "../../../scripts/siteConfig.js";
+const site = loadSiteConfig();
+
 
 export async function getStaticPaths() {
-  return episodes.map((episode) => ({
+  return publishedEpisodes.map((episode) => ({
     params: { id: episode.id },
     props: { episode },
   }));
 }
 
 const { episode } = Astro.props;
-const { id } = Astro.params;
-
-const date = new Date(episode.pubDate);
-const formattedDate = date.toLocaleDateString("zh-CN", {
+const formattedDate = formatEpisodeDate(episode.pubDate, {
   year: "numeric",
   month: "long",
   day: "numeric",
 });
 
-// 封面图可能为空，使用统一默认值兜底
 const coverImage = episode.itunes?.image || site.assets.defaultCover;
 
-// Format duration
 const duration = episode.itunes?.duration || site.ui.unknownDurationLabel;
-const episodeNumber =
-  (episode.itunes as any)?.episode || site.ui.episodeNumberFallbackLabel;
+const episodeNumber = extractEpisodeNumber(episode, site.ui.episodeNumberFallbackLabel);
 const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
+const transcriptsEnabled = site.features?.transcripts === true;
 
-// Try to get transcript
 let transcript;
-let TranscriptContent;
+let transcriptHtml = "";
 let isTranscriptPlaceholder = false;
-try {
-  transcript = await getEntry("transcripts", episode.id);
-  if (transcript) {
-    const rendered = await transcript.render();
-    TranscriptContent = rendered.Content;
-
-    // Astro 5 Content Layer may not expose transcript.body directly, so we read from the markdown file directly
-    let rawMarkdown = "";
-    try {
-      const transcriptFilePath = path.join(process.cwd(), "src/content/transcripts", `${episode.id}.md`);
-      if (fs.existsSync(transcriptFilePath)) {
-        rawMarkdown = fs.readFileSync(transcriptFilePath, "utf-8");
-      }
-    } catch (err) {
-      console.log(`Failed to read raw transcript file for ${episode.id}:`, err);
-    }
-
-    // 判断是否是占位符
-    isTranscriptPlaceholder =
-      rawMarkdown.includes("暂未提供文字稿");
+if (transcriptsEnabled) {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { marked } = await import("marked");
+  const transcriptPath = path.join(process.cwd(), "src/content/transcripts", `${episode.id}.md`);
+  if (fs.existsSync(transcriptPath)) {
+    const raw = fs.readFileSync(transcriptPath, "utf-8");
+    const cleanBody = raw.replace(/^---[\s\S]*?---\s*/, "");
+    transcriptHtml = await marked.parse(cleanBody);
+    isTranscriptPlaceholder = Boolean(raw.includes(site.transcripts?.placeholderNotice || ""));
+    transcript = {
+      id: episode.id,
+      body: cleanBody,
+      data: {},
+    };
   }
-} catch (e) {
-  console.log(`No transcript found for episode ${episode.id}`);
 }
 
-// 安全清理 RSS 内容，防止 XSS 攻击
-const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
+const canShowTranscript = transcriptsEnabled;
+const hasTranscriptContent = transcriptHtml !== "" && !isTranscriptPlaceholder;
+
+const SANITIZE_OPTIONS = {
   ALLOWED_TAGS: [
     "p", "br", "strong", "em", "a", "ul", "ol", "li",
     "h2", "h3", "img", "figure", "figcaption", "blockquote",
   ],
   ALLOWED_ATTR: ["href", "src", "alt", "class"],
   ALLOW_DATA_ATTR: false,
-});
+};
+
+const sanitizedContent = DOMPurify.sanitize(episode.content || "", SANITIZE_OPTIONS);
+const sanitizedTranscript = DOMPurify.sanitize(transcriptHtml, SANITIZE_OPTIONS);
 ---
 
 <MainLayout title={episode.title}>
   <article class="max-w-6xl mx-auto w-full" data-episode-page>
-    <!-- Breadcrumbs -->
     <nav class="mb-6 sm:mb-8 md:mb-12 font-serif text-xs sm:text-sm opacity-50">
       <a href="/episodes" class="hover:text-orange-800 transition-colors"
         >{site.pages.episodeDetail.breadcrumbListLabel}</a
@@ -85,9 +75,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
       <span class="text-[#2d2a26]">{site.pages.episodeDetail.breadcrumbCurrentLabel}</span>
     </nav>
 
-    <!-- Header Section -->
     <header class="flex flex-col md:flex-row md:items-stretch gap-5 sm:gap-6 md:gap-8 lg:gap-12 mb-10 sm:mb-12 md:mb-20">
-      <!-- 封面图：移动端隐藏，桌面端显示固定 1:1 比例 -->
       <div
         class="hidden md:block w-60 lg:w-72 shrink-0 shadow-2xl border border-[#2d2a26]/5 overflow-hidden bg-[#f0ede8] rounded-2xl md:aspect-square self-start md:self-stretch"
         data-fit-cover
@@ -132,7 +120,6 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
             {episode.title}
           </h1>
 
-          <!-- Tags -->
           {
             episode.tags && episode.tags.length > 0 && (
               <div class="flex flex-wrap gap-2 mb-4">
@@ -154,36 +141,11 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
             class="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm font-serif opacity-60"
           >
             <div class="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="size-4 sm:size-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
+              <i class="ri-time-line text-sm sm:text-base"></i>
               {duration}
             </div>
             <div class="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="size-4 sm:size-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-                ></path>
-              </svg>
+              <i class="ri-music-2-line text-sm sm:text-base"></i>
               {episode.enclosure?.type?.split("/")[1]?.toUpperCase() || "MP3"}
             </div>
           </div>
@@ -195,47 +157,27 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
               data-audio={episode.enclosure?.url}
               data-cover={coverImage}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="size-2.5 sm:size-3 translate-x-0.5"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M8 5v14l11-7z"></path>
-              </svg>
+              <i class="ri-play-fill text-xs sm:text-sm translate-x-0.5"></i>
               <span>{site.pages.episodeDetail.playNowLabel}</span>
             </button>
 
             {
-              TranscriptContent && (
+              canShowTranscript && (
                 <button
                   id="download-md"
                   class={`flex items-center gap-2.5 px-5 sm:px-6 py-3 border font-serif text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] transition-all rounded-lg shadow-sm ${
-                    isTranscriptPlaceholder
-                      ? "border-gray-200 text-gray-400 bg-gray-100/50 opacity-60 cursor-not-allowed"
+                    !hasTranscriptContent
+                      ? "border-gray-200 text-gray-400 bg-gray-100/50 opacity-50 cursor-not-allowed pointer-events-none"
                       : "border-[#2d2a26]/10 text-[#2d2a26] hover:bg-[#2d2a26]/5 cursor-pointer"
                   }`}
                   title={
-                    isTranscriptPlaceholder
-                      ? "文字稿正在转化中，暂不可下载"
+                    !hasTranscriptContent
+                      ? "文字稿正在整理中，暂不可下载"
                       : site.pages.episodeDetail.downloadTranscriptTitle
                   }
-                  disabled={isTranscriptPlaceholder}
+                  disabled={!hasTranscriptContent}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="size-3.5 sm:size-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+                  <i class="ri-download-2-line text-sm"></i>
                   <span>{site.pages.episodeDetail.downloadTranscriptLabel}</span>
                 </button>
               )
@@ -245,11 +187,9 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
       </div>
     </header>
 
-    <!-- Content Section -->
     <section
       class="prose prose-orange max-w-none prose-headings:font-serif prose-p:font-serif prose-p:leading-relaxed prose-p:text-[#2d2a26]/80 bg-white p-5 sm:p-6 md:p-10 lg:p-14 border border-[#2d2a26]/5 shadow-sm rounded-2xl"
     >
-      <!-- Tabs Navigation -->
       <div
         class="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[#2d2a26]/10 mb-8 sm:mb-10 pb-4"
       >
@@ -260,33 +200,30 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
         >
           {site.pages.episodeDetail.infoTabLabel}
         </button>
-        <button
-          class={`tab-btn text-base sm:text-lg font-bold font-serif transition-all ${
-            !TranscriptContent || isTranscriptPlaceholder
-              ? "opacity-30 cursor-not-allowed"
-              : "opacity-40 hover:opacity-100 hover:text-orange-700"
-          }`}
-          type="button"
-          data-target="transcript"
-          disabled={!TranscriptContent || isTranscriptPlaceholder}
-          title={
-            !TranscriptContent || isTranscriptPlaceholder
-              ? site.pages.episodeDetail.transcriptEmptyTitle
-              : ""
-          }
-        >
-          {site.pages.episodeDetail.transcriptTabLabel}
-          {
-            TranscriptContent && !isTranscriptPlaceholder && (
-              <span class="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-serif font-bold tracking-wider">
-                {site.pages.episodeDetail.transcriptNewBadgeLabel}
-              </span>
-            )
-          }
-        </button>
+        {
+          canShowTranscript && (
+            <button
+              class="tab-btn text-base sm:text-lg font-bold font-serif transition-all opacity-40 hover:opacity-100 hover:text-orange-700 cursor-pointer inline-flex items-center"
+              type="button"
+              data-target="transcript"
+            >
+              {site.pages.episodeDetail.transcriptTabLabel}
+              {
+                hasTranscriptContent ? (
+                  <span class="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-serif font-bold tracking-wider">
+                    {site.pages.episodeDetail.transcriptNewBadgeLabel || "精校"}
+                  </span>
+                ) : (
+                  <span class="ml-2 text-[10px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded-full font-serif tracking-wider">
+                    整理中
+                  </span>
+                )
+              }
+            </button>
+          )
+        }
       </div>
 
-      <!-- Episode Info Panel -->
       <div
         id="panel-info"
         class="tab-panel transition-opacity duration-300 ease-in-out"
@@ -298,30 +235,45 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
         />
       </div>
 
-      <!-- Transcript Panel -->
       {
-        TranscriptContent && (
+        canShowTranscript && (
           <div
             id="panel-transcript"
             class="tab-panel hidden opacity-0 transition-opacity duration-300 ease-in-out"
           >
-            {transcript?.data.contributors && (
-              <div class="mb-6 sm:mb-8 p-4 bg-[#f9f8f6] rounded-lg border border-[#2d2a26]/5">
-                <span class="text-xs font-bold uppercase tracking-widest opacity-50 block mb-2">
-                  {site.pages.episodeDetail.transcriptContributorsLabel}
-                </span>
-                <div class="flex flex-wrap gap-2">
-                  {transcript?.data.contributors.map((p: string) => (
-                    <span class="text-sm font-serif bg-white px-3 py-1 rounded-md border border-[#2d2a26]/5 shadow-sm">
-                      {p}
+            {hasTranscriptContent ? (
+              <>
+                {transcript?.data.contributors && (
+                  <div class="mb-6 sm:mb-8 p-4 bg-[#f9f8f6] rounded-lg border border-[#2d2a26]/5">
+                    <span class="text-xs font-bold uppercase tracking-widest opacity-50 block mb-2">
+                      {site.pages.episodeDetail.transcriptContributorsLabel}
                     </span>
-                  ))}
+                    <div class="flex flex-wrap gap-2">
+                      {transcript?.data.contributors.map((p: string) => (
+                        <span class="text-sm font-serif bg-white px-3 py-1 rounded-md border border-[#2d2a26]/5 shadow-sm">
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div class="transcript-content">
+                  <Fragment set:html={sanitizedTranscript} />
                 </div>
+              </>
+            ) : (
+              <div class="py-12 px-6 text-center bg-[#faf9f7] rounded-2xl border border-[#2d2a26]/10 my-4">
+                <div class="w-12 h-12 mx-auto mb-3.5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center">
+                  <i class="ri-file-text-line text-xl"></i>
+                </div>
+                <h3 class="text-base font-bold text-[#2d2a26] mb-1.5 font-serif">
+                  {site.pages.episodeDetail.transcriptEmptyTitle || "文字稿整理中..."}
+                </h3>
+                <p class="text-xs text-[#2d2a26]/65 font-serif max-w-md mx-auto leading-relaxed">
+                  {site.transcripts?.placeholderNotice || "暂未提供文字稿，待使用通义听悟/NotebookLM 转化后提供"}
+                </p>
               </div>
             )}
-            <div class="transcript-content">
-              <TranscriptContent />
-            </div>
           </div>
         )
       }
@@ -329,8 +281,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
   </article>
 </MainLayout>
 
-<script define:vars={{ episode, formattedDate, downloadMetaDateLabel: site.pages.episodeDetail.downloadMetaDateLabel, downloadMetaAudioLabel: site.pages.episodeDetail.downloadMetaAudioLabel }}>
-  // Tab Switching Logic
+<script is:inline define:vars={{ episode, coverImage, formattedDate, downloadMetaDateLabel: site.pages.episodeDetail.downloadMetaDateLabel, downloadMetaAudioLabel: site.pages.episodeDetail.downloadMetaAudioLabel }}>
   function initTabs(pageRoot) {
     const tabs = pageRoot.querySelectorAll(".tab-btn");
     let isAnimating = false;
@@ -348,17 +299,13 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     };
 
     const swapPanels = (currentPanel, targetPanel) => {
-      // Fade out current
       currentPanel.style.opacity = "0";
       setTimeout(() => {
         currentPanel.classList.add("hidden");
 
-        // Prepare target
         targetPanel.classList.remove("hidden");
-        // Force reflow
         void targetPanel.offsetWidth;
 
-        // Fade in target
         targetPanel.style.opacity = "1";
         setTimeout(() => {
           isAnimating = false;
@@ -381,14 +328,11 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
 
         isAnimating = true;
 
-        // Update Tab Styles
         setActiveTab(tab);
 
-        // Transition Logic
         if (currentPanel) {
           swapPanels(currentPanel, targetPanel);
         } else {
-          // Fallback for initial state quirks
           targetPanel.classList.remove("hidden");
           void targetPanel.offsetWidth;
           targetPanel.style.opacity = "1";
@@ -404,9 +348,11 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     );
     if (!contentAreas.length) return;
 
-    const TIMESTAMP_PATTERN = /(\d{1,2}:\d{2}(?::\d{2})?)/g;
+    const TIMESTAMP_PATTERN =
+      /(?:\[)?(?:<a\b[^>]*>)?(?:\[)?(?<![\d:])(\d{1,2}:\d{2}(?::\d{2})?)(?![\d:])(?:\])?(?:<\/a>)?(?:\])?/g;
     const parseTimeToSeconds = (timeStr) => {
-      const parts = timeStr.split(":").map(Number);
+      const clean = timeStr.replace(/[^\d:]/g, "");
+      const parts = clean.split(":").map(Number);
       if (parts.length === 3) {
         return parts[0] * 3600 + parts[1] * 60 + parts[2];
       } else if (parts.length === 2) {
@@ -419,13 +365,15 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
       if (area.dataset.processed) return;
 
       const audioUrl = encodeURIComponent(episode.enclosure?.url || "");
-      const coverUrl = encodeURIComponent(episode.itunes?.image || "");
+      const coverUrl = encodeURIComponent(episode.itunes?.image || coverImage || "");
+      const currentEpId = encodeURIComponent(episode.id || "");
       const content = area.innerHTML;
       const processedContent = content.replace(
         TIMESTAMP_PATTERN,
-        (match) => {
+        (_fullMatch, time) => {
+          const match = time;
           const seconds = parseTimeToSeconds(match);
-          return `<button type="button" class="timestamp-link" data-seconds="${seconds}" data-audio="${audioUrl}" data-cover="${coverUrl}">${match}</button>`;
+          return `<button type="button" class="timestamp-link inline-flex items-center gap-1 text-orange-800 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 px-1.5 py-0.5 rounded font-mono text-xs font-semibold mx-1 cursor-pointer transition-colors" data-seconds="${seconds}" data-audio="${audioUrl}" data-cover="${coverUrl}" data-episode-id="${currentEpId}">▶ ${match}</button>`;
         },
       );
       area.innerHTML = processedContent;
@@ -433,7 +381,8 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     });
   }
 
-  // timestamp-link 点击委托：模块级单例，只注册一次
+  window.detectAndWrapTimestamps = initTimestampLinks;
+
   if (!window.__timestampListenerBound) {
     window.__timestampListenerBound = true;
     document.addEventListener("click", (e) => {
@@ -444,9 +393,10 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
       const audioUrl = decodeURIComponent(target.dataset.audio || "");
       if (!audioUrl) return;
       const cover = decodeURIComponent(target.dataset.cover || "");
+      const episodeId = decodeURIComponent(target.dataset.episodeId || "");
 
       if (typeof window.seekToTimestamp === "function") {
-        window.seekToTimestamp(seconds, audioUrl, "", cover);
+        window.seekToTimestamp(seconds, audioUrl, episodeId, cover);
       }
     });
   }
@@ -454,19 +404,6 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
   function initDownload() {
     const downloadBtn = document.getElementById("download-md");
     if (!downloadBtn || !window.episodeData?.transcript) return;
-
-    // 客户端双重保障：检测文字稿正文是否包含占位符关键字
-    const isPlaceholder = () => {
-      const bodyText = window.episodeData.transcript.body || "";
-      return bodyText.includes("暂未提供文字稿");
-    };
-
-    if (isPlaceholder()) {
-      downloadBtn.setAttribute("disabled", "true");
-      downloadBtn.classList.add("border-gray-200", "text-gray-400", "bg-gray-100/50", "opacity-60", "cursor-not-allowed");
-      downloadBtn.classList.remove("border-[#2d2a26]/10", "text-[#2d2a26]", "hover:bg-[#2d2a26]/5", "cursor-pointer");
-      downloadBtn.title = "文字稿正在转化中，暂不可下载";
-    }
 
     const buildMarkdown = () => {
       const { episode, formattedDate, transcript } = window.episodeData;
@@ -479,7 +416,7 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     };
 
     downloadBtn.addEventListener("click", (e) => {
-      if (downloadBtn.hasAttribute("disabled") || isPlaceholder()) {
+      if (downloadBtn.hasAttribute("disabled")) {
         e.preventDefault();
         return;
       }
@@ -570,6 +507,14 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
 </script>
 
 <style is:global>
+  .episode-content,
+  .transcript-content {
+    overflow-wrap: anywhere;
+  }
+  .episode-content pre,
+  .transcript-content pre {
+    overflow-x: auto;
+  }
   .episode-content h2,
   .transcript-content h2 {
     font-size: 1.5rem;
@@ -613,22 +558,8 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
     margin-bottom: 0.5rem;
   }
   .timestamp-link {
-    color: #c2410c;
-    font-weight: 500;
-    cursor: pointer;
     border: 0;
-    padding: 0.125rem 0.375rem;
-    margin: 0 0.125rem;
-    border-radius: 0.25rem;
-    background: rgba(193, 65, 12, 0.08);
-    transition: all 0.2s ease;
     text-decoration: none !important;
-    display: inline-block;
-    font: inherit;
-  }
-  .timestamp-link:hover {
-    background: rgba(193, 65, 12, 0.2);
-    color: #9a3412;
   }
   .timestamp-link:focus-visible {
     outline: 2px solid #c2410c;
@@ -654,6 +585,10 @@ const sanitizedContent = DOMPurify.sanitize(episode.content || "", {
   }
 </style>
 
-<script define:vars={{ episode, formattedDate, transcript }}>
-  window.episodeData = { episode, formattedDate, transcript };
+<script is:inline define:vars={{ episode, formattedDate, transcript, transcriptsEnabled }}>
+  window.episodeData = {
+    episode,
+    formattedDate,
+    transcript: transcriptsEnabled ? transcript : null,
+  };
 </script>

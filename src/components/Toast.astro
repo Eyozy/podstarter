@@ -1,0 +1,82 @@
+---
+---
+
+<div
+  id="toast-container"
+  class="fixed top-6 left-1/2 -translate-x-1/2 z-9999 flex flex-col items-center gap-2 pointer-events-none max-w-sm sm:max-w-md w-full px-4"
+  aria-live="polite"
+  aria-atomic="true"
+>
+</div>
+
+<script is:inline>
+  (() => {
+    const icons = {
+      success: "ri-checkbox-circle-fill text-emerald-600",
+      error: "ri-error-warning-fill text-red-600",
+      warning: "ri-alert-fill text-amber-600",
+      info: "ri-information-fill text-orange-800",
+    };
+
+    const borders = {
+      success: "border-emerald-200/80 bg-white/95 text-emerald-950",
+      error: "border-red-200/80 bg-white/95 text-red-950",
+      warning: "border-amber-200/80 bg-white/95 text-amber-950",
+      info: "border-[#2d2a26]/10 bg-white/95 text-[#2d2a26]",
+    };
+
+    function showToast(message, type = "info", duration = 3000) {
+      if (!message) return;
+      const container = document.getElementById("toast-container");
+      if (!container) return;
+      for (const child of Array.from(container.children)) {
+        if (child.dataset.msg === message) {
+          child.remove();
+        }
+      }
+
+      const toast = document.createElement("div");
+      toast.dataset.msg = message;
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl border shadow-[0_12px_32px_-4px_rgba(0,0,0,0.12)] backdrop-blur-md font-serif text-xs leading-normal transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform -translate-y-4 scale-95 opacity-0 ${borders[type] || borders.info}`;
+      
+      const iconClass = icons[type] || icons.info;
+      toast.innerHTML = `
+        <i class="${iconClass} text-base shrink-0"></i>
+        <div class="flex-1 break-words font-medium">${String(message).replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+        <button type="button" class="shrink-0 text-[#2d2a26]/30 hover:text-[#2d2a26] ml-2 p-0.5 transition-colors cursor-pointer" aria-label="关闭">
+          <i class="ri-close-line text-sm"></i>
+        </button>
+      `;
+      const closeBtn = toast.querySelector("button");
+      let timer = null;
+
+      const remove = () => {
+        if (timer) clearTimeout(timer);
+        toast.classList.remove("translate-y-0", "scale-100", "opacity-100");
+        toast.classList.add("-translate-y-4", "scale-95", "opacity-0");
+        setTimeout(() => toast.remove(), 300);
+      };
+
+      closeBtn?.addEventListener("click", remove);
+
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove("-translate-y-4", "scale-95", "opacity-0");
+        toast.classList.add("translate-y-0", "scale-100", "opacity-100");
+      });
+
+      if (duration > 0) {
+        timer = setTimeout(remove, duration);
+      }
+    }
+
+    window.toast = {
+      show: (msg, type, dur) => showToast(msg, type, dur),
+      success: (msg, dur) => showToast(msg, "success", dur),
+      error: (msg, dur) => showToast(msg, "error", dur),
+      warning: (msg, dur) => showToast(msg, "warning", dur),
+      info: (msg, dur) => showToast(msg, "info", dur),
+    };
+  })();
+</script>

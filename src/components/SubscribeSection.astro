@@ -1,0 +1,164 @@
+---
+import { loadSiteConfig } from "../../scripts/siteConfig.js";
+const site = loadSiteConfig();
+
+const podcast = (site.podcast && typeof site.podcast === "object" ? site.podcast : {}) as Record<string, string | undefined>;
+const hasApple = Boolean(podcast?.appleUrl?.trim());
+const hasXiaoyuzhou = Boolean(podcast?.xiaoyuzhouUrl?.trim());
+const hasXimalaya = Boolean(podcast?.ximalayaUrl?.trim());
+const hasSpotify = Boolean(podcast?.spotifyUrl?.trim());
+const hasNetease = Boolean(podcast?.neteaseUrl?.trim());
+const hasXiaoyuzhouQr = Boolean(podcast?.xiaoyuzhouQr?.trim());
+const hasWechatQr = Boolean(podcast?.wechatQr?.trim());
+const hasAnyQr = hasXiaoyuzhouQr || hasWechatQr;
+---
+
+<section class="mb-12 sm:mb-14 bg-white/45 border border-[#2d2a26]/5 p-5 sm:p-8 md:p-10 relative overflow-hidden rounded-2xl">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center">
+    <div class="space-y-5 sm:space-y-6">
+      <div class="space-y-2">
+        <p class="text-[10px] sm:text-[11px] font-serif font-bold uppercase tracking-[0.22em] text-orange-900/80">
+          Connect
+        </p>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[#2d2a26]">{site.sections.rssTitle}</h2>
+      </div>
+      <p class="text-sm md:text-base text-[#6f685f] leading-relaxed font-serif max-w-md">
+        {site.sections.rssDescription}
+      </p>
+
+      <div class="flex flex-wrap gap-3 sm:gap-6 pt-2 sm:pt-3">
+        {hasApple && (
+          <a
+            href={podcast.appleUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-1.5 text-xs font-serif font-bold uppercase tracking-widest hover:text-orange-700 transition-colors"
+          >
+            <i class="ri-apple-fill text-base"></i>
+            Apple Podcasts
+          </a>
+        )}
+
+        {hasXiaoyuzhou && (
+          <a
+            href={podcast.xiaoyuzhouUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-1.5 text-xs font-serif font-bold uppercase tracking-widest hover:text-orange-700 transition-colors"
+          >
+            <i class="ri-broadcast-fill text-base text-orange-800"></i>
+            小宇宙
+          </a>
+        )}
+
+        {hasXimalaya && (
+          <a
+            href={podcast.ximalayaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-1.5 text-xs font-serif font-bold uppercase tracking-widest hover:text-orange-700 transition-colors"
+          >
+            <i class="ri-radio-line text-base"></i>
+            喜马拉雅
+          </a>
+        )}
+
+        {hasSpotify && (
+          <a
+            href={podcast.spotifyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-1.5 text-xs font-serif font-bold uppercase tracking-widest hover:text-orange-700 transition-colors"
+          >
+            <i class="ri-spotify-fill text-base text-green-700"></i>
+            Spotify
+          </a>
+        )}
+        {hasNetease && (
+          <a
+            href={podcast.neteaseUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-1.5 text-xs font-serif font-bold uppercase tracking-widest hover:text-orange-700 transition-colors"
+          >
+            <i class="ri-netease-cloud-music-fill text-base text-red-600"></i>
+            网易云音乐
+          </a>
+        )}
+
+        <a
+          href="/rss.xml"
+          target="_blank"
+          class="flex items-center gap-1.5 text-xs font-serif font-bold uppercase tracking-widest hover:text-orange-700 transition-colors"
+        >
+          <i class="ri-rss-line text-base text-orange-700"></i>
+          RSS 订阅源
+        </a>
+      </div>
+    </div>
+
+    <div class="relative flex justify-center md:justify-end">
+      {hasAnyQr ? (
+        <div class="flex w-full max-w-sm md:max-w-none flex-nowrap justify-center md:justify-end gap-3 sm:gap-4">
+          {hasXiaoyuzhouQr && (
+            <div class="text-center flex-1 min-w-0 max-w-44">
+              <div class="w-full rounded-2xl border border-[#2d2a26]/5 bg-white/80 p-3 sm:p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                <div class="mb-3 flex items-center justify-center gap-1.5 text-[#2d2a26]">
+                  <i class="ri-broadcast-fill text-sm text-orange-800"></i>
+                  <p class="text-[11px] font-serif font-bold uppercase tracking-[0.2em] text-[#5f584f]">
+                    小宇宙
+                  </p>
+                </div>
+                <div
+                  class="aspect-square mb-3 flex items-center justify-center bg-white bg-cover bg-center rounded-xl overflow-hidden p-2"
+                  style={`background-image: url('${podcast.xiaoyuzhouQr}')`}
+                ></div>
+                <p class="text-[10px] font-serif text-[#726a61] uppercase tracking-[0.2em] font-bold">
+                  扫码收听
+                </p>
+              </div>
+            </div>
+          )}
+
+          {hasWechatQr && (
+            <div class="text-center flex-1 min-w-0 max-w-44">
+              <div class="w-full rounded-2xl border border-[#2d2a26]/5 bg-white/80 p-3 sm:p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                <div class="mb-3 flex items-center justify-center gap-1.5 text-[#2d2a26]">
+                  <i class="ri-wechat-fill text-sm text-green-700"></i>
+                  <p class="text-[11px] font-serif font-bold uppercase tracking-[0.2em] text-[#5f584f]">
+                    微信公众号
+                  </p>
+                </div>
+                <div
+                  class="aspect-square mb-3 flex items-center justify-center bg-white bg-cover bg-center rounded-xl overflow-hidden p-2"
+                  style={`background-image: url('${podcast.wechatQr}')`}
+                ></div>
+                <p class="text-[10px] font-serif text-[#726a61] uppercase tracking-[0.2em] font-bold">
+                  扫码关注
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div class="w-full max-w-sm rounded-2xl border border-[#2d2a26]/10 bg-white/80 p-6 shadow-sm text-center">
+          <div class="size-12 rounded-full bg-orange-50 border border-orange-200/80 text-orange-800 flex items-center justify-center mx-auto mb-3">
+            <i class="ri-rss-line text-2xl"></i>
+          </div>
+          <h3 class="text-sm font-bold text-[#2d2a26] mb-1">原生 RSS 订阅直链</h3>
+          <p class="text-xs text-[#2d2a26]/60 font-serif leading-relaxed mb-4">
+            可在任何泛用型播客客户端（Apple Podcasts、Pocket Casts、小宇宙等）中粘贴订阅。
+          </p>
+          <a
+            href="/rss.xml"
+            target="_blank"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2d2a26] text-white text-xs font-mono font-bold hover:bg-orange-800 transition-colors shadow-xs"
+          >
+            <i class="ri-external-link-line"></i>
+            打开 /rss.xml
+          </a>
+        </div>
+      )}
+    </div>
+  </div>
+</section>

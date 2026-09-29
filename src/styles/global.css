@@ -1,29 +1,27 @@
 @import "tailwindcss";
+@import "remixicon/fonts/remixicon.css";
 
 /* 自定义 xs 断点 (425px) */
 @theme {
   --breakpoint-xs: 425px;
 }
 
-/* 修复 line-clamp - 放在 tailwind 导入后，使用高特异性 */
-@layer utilities {
-  .description-clamp-2 {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-  }
-}
 
 @layer base {
   html {
     scroll-behavior: smooth;
   }
 
-  :focus-visible {
-    outline: 2px solid #c2410c;
-    outline-offset: 3px;
+  :focus-visible:not(input):not(textarea):not(select) {
+    outline: none;
+    box-shadow: 0 0 0 2px #f5f2ed, 0 0 0 4px #c2410c;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
 }
 
@@ -52,28 +50,6 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
-/* 移动端搜索框优化 */
-@media (max-width: 768px) {
-  aside.sticky {
-    position: relative !important;
-    top: 0 !important;
-  }
-}
-
-/* 修复 line-clamp 在 Tailwind v4 中的问题 - 使用高优先级选择器 */
-p.description-clamp-mobile-hidden {
-  display: none;
-}
-
-@media (min-width: 640px) {
-  p.description-clamp-mobile-hidden {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    line-clamp: 2 !important;
-  }
-}
 
 /* 搜索关键词高亮样式 */
 mark {
@@ -100,4 +76,29 @@ mark {
   vertical-align: baseline;
   white-space: nowrap;
   opacity: 0.82;
+}
+
+/* 修复 textarea 在 Chrome/Safari 下原生滚动条破坏边角大圆角的问题 */
+textarea {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 42, 38, 0.2) transparent;
+}
+
+textarea::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background: rgba(45, 42, 38, 0.2);
+  border-radius: 9999px;
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background: rgba(45, 42, 38, 0.35);
 }

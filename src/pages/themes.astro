@@ -1,32 +1,23 @@
 ---
 import MainLayout from "../layouts/MainLayout.astro";
 import EpisodeCard from "../components/EpisodeCard.astro";
+import type { Theme } from "../types";
+import { publishedEpisodes } from "../utils/episodes";
 import themesData from "../data/themes.json";
-import episodes from "../data/episodes.json";
-// 页面标题与空状态文案在 site.json 中配置。
-import site from "../data/site.json";
+import { loadSiteConfig } from "../../scripts/siteConfig.js";
+const site = loadSiteConfig();
 
-// 主题类型定义
-type Theme = {
-  id: string;
-  title: string;
-  description: string;
-  representativeTags?: string[];
-};
 
-// AI 功能关闭时返回 404
-const aiEnabled = site.features?.aiTagging === true;
-if (!aiEnabled) {
+const themesEnabled = site.features?.themes === true;
+if (!themesEnabled) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
 
-// 类型断言
 const themes = themesData as Theme[];
 
-// 为每个主题计算节目数量
 const themesWithCount = themes.map((theme) => ({
   ...theme,
-  count: episodes.filter((ep) => ep.themeId === theme.id).length,
+  count: publishedEpisodes.filter((ep) => ep.themeId === theme.id).length,
 }));
 ---
 
@@ -43,27 +34,46 @@ const themesWithCount = themes.map((theme) => ({
       </h1>
     </div>
 
-    <!-- 主题选择器 -->
-    <div class="flex flex-wrap gap-2.5 sm:gap-3 mb-8 sm:mb-10 md:mb-12">
-      {
-        themesWithCount.map((theme, index) => (
-          <button
-            class:list={[
-              "theme-tab px-3.5 py-2 sm:px-4 md:px-6 md:py-3 rounded-full font-serif text-sm md:text-base transition-all duration-300 border shadow-sm",
-              index === 0
-                ? "bg-[#2d2a26] text-white border-[#2d2a26] hover:bg-[#2d2a26] hover:text-white shadow-[0_10px_20px_-16px_rgba(0,0,0,0.45)]"
-                : "bg-white text-[#2d2a26] border-[#2d2a26]/10 hover:text-[#2d2a26] hover:border-[#2d2a26]/30 hover:bg-white/90",
-            ]}
-            data-theme-id={theme.id}
-          >
-            <span class="font-bold">{theme.title}</span>
-            <span class="ml-1.5 opacity-60">({theme.count})</span>
-          </button>
-        ))
-      }
-    </div>
+    {themesWithCount.length === 0 ? (
+      <div class="py-16 text-center border border-dashed border-[#2d2a26]/15 rounded-2xl bg-white/40 p-8 sm:p-12 mb-12 max-w-xl mx-auto">
+        <div class="size-12 rounded-2xl bg-orange-50 border border-orange-200/80 text-orange-800 flex items-center justify-center mx-auto mb-4">
+          <i class="ri-sparkling-line text-xl"></i>
+        </div>
+        <h3 class="text-base font-bold text-[#2d2a26] mb-1.5 font-serif">暂无主题分类</h3>
+        <p class="text-xs text-[#2d2a26]/60 font-serif leading-relaxed mb-6">
+          可直接在终端执行 <code class="px-1.5 py-0.5 rounded bg-black/5 font-mono text-[11px] text-[#2d2a26] font-bold">npm run analyze</code> 智能聚类生成主题，或前往管理后台查看完整打标工作流。
+        </p>
+        <a
+          href="/admin#config"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2d2a26] text-white text-xs font-mono font-bold hover:bg-orange-800 transition-colors shadow-sm"
+        >
+          前往管理后台查看指引 ↗
+        </a>
+      </div>
+    ) : (
+      <div
+        class="flex flex-wrap gap-2.5 sm:gap-3 mb-8 sm:mb-10 md:mb-12"
+        data-theme-tabs-root
+      >
+        {
+          themesWithCount.map((theme, index) => (
+            <button
+              class:list={[
+                "theme-tab px-3.5 py-2 sm:px-4 md:px-6 md:py-3 rounded-full font-serif text-sm md:text-base transition-all duration-300 border shadow-sm",
+                index === 0
+                  ? "bg-[#2d2a26] text-white border-[#2d2a26] hover:bg-[#2d2a26] hover:text-white shadow-[0_10px_20px_-16px_rgba(0,0,0,0.45)]"
+                  : "bg-white text-[#2d2a26] border-[#2d2a26]/10 hover:text-[#2d2a26] hover:border-[#2d2a26]/30 hover:bg-white/90",
+              ]}
+              data-theme-id={theme.id}
+            >
+              {theme.title}
+              <span class="ml-1.5 text-xs opacity-60">({theme.count})</span>
+            </button>
+          ))
+        }
+      </div>
+    )}
 
-    <!-- 主题描述 -->
     <div class="mb-8 sm:mb-10">
       {
         themes.map((theme, index) => (
@@ -92,10 +102,9 @@ const themesWithCount = themes.map((theme) => ({
       }
     </div>
 
-    <!-- 节目列表 -->
     {
       themes.map((theme, index) => {
-        const themeEpisodes = episodes.filter((ep) => ep.themeId === theme.id);
+        const themeEpisodes = publishedEpisodes.filter((ep) => ep.themeId === theme.id);
 
         return (
           <div
@@ -125,11 +134,15 @@ const themesWithCount = themes.map((theme) => ({
 
 <script>
   function initThemeTabs() {
+    const tabsRoot = document.querySelector("[data-theme-tabs-root]");
+    if (!(tabsRoot instanceof HTMLElement)) return;
+    if (tabsRoot.dataset.bound === "true") return;
+    tabsRoot.dataset.bound = "true";
+
     const tabs = document.querySelectorAll(".theme-tab");
     const descriptions = document.querySelectorAll(".theme-description");
     const episodeLists = document.querySelectorAll(".theme-episodes");
 
-    // 样式常量
     const ACTIVE_TAB = [
       "bg-[#2d2a26]",
       "text-white",
@@ -147,7 +160,6 @@ const themesWithCount = themes.map((theme) => ({
       "hover:bg-white/90",
     ];
 
-    // 辅助函数：根据 data 属性切换元素显示
     function showByAttribute(
       elements: NodeListOf<Element>,
       attrName: string,
@@ -164,7 +176,6 @@ const themesWithCount = themes.map((theme) => ({
       tab.addEventListener("click", () => {
         const themeId = tab.getAttribute("data-theme-id");
 
-        // 更新 tab 样式
         tabs.forEach((t) => {
           t.classList.remove(...ACTIVE_TAB);
           t.classList.add(...INACTIVE_TAB);
@@ -172,7 +183,6 @@ const themesWithCount = themes.map((theme) => ({
         tab.classList.remove(...INACTIVE_TAB);
         tab.classList.add(...ACTIVE_TAB);
 
-        // 切换描述和节目列表
         showByAttribute(descriptions, "data-theme-desc", themeId);
         showByAttribute(episodeLists, "data-theme-list", themeId);
 
@@ -183,5 +193,16 @@ const themesWithCount = themes.map((theme) => ({
     });
   }
 
+  const scheduleThemeTabsInit = () => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initThemeTabs, {
+        once: true,
+      });
+      return;
+    }
+    initThemeTabs();
+  };
+
+  scheduleThemeTabsInit();
   document.addEventListener("astro:page-load", initThemeTabs);
 </script>

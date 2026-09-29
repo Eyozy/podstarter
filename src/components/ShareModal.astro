@@ -1,5 +1,6 @@
 ---
-import site from "../data/site.json";
+import { loadSiteConfig } from "../../scripts/siteConfig.js";
+const site = loadSiteConfig();
 ---
 
 <div
@@ -12,14 +13,12 @@ import site from "../data/site.json";
   data-error-message={site.shareCard.generateErrorMessage}
   data-filename-prefix={site.shareCard.filenamePrefix}
 >
-  <!-- 背景遮罩 -->
   <div
     class="absolute inset-0 bg-[#2d2a26]/80 backdrop-blur-sm"
     id="share-modal-overlay"
   >
   </div>
 
-  <!-- 模态框主体 -->
   <div
     class="relative bg-[#f5f2ed] p-2 sm:p-4 md:p-6 max-w-3xl w-full shadow-2xl rounded-2xl border border-[#2d2a26]/10 transform scale-95 transition-transform duration-300 max-h-[90vh] flex flex-col"
     id="share-modal-content"
@@ -38,19 +37,7 @@ import site from "../data/site.json";
         class="opacity-40 hover:opacity-100 transition-opacity p-1"
         aria-label={site.ui.closeLabel}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="size-5 sm:size-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
+        <i class="ri-close-line text-xl"></i>
       </button>
     </div>
 
@@ -59,20 +46,16 @@ import site from "../data/site.json";
       class="overflow-y-auto overflow-x-hidden min-h-0 mb-2 sm:mb-5 flex justify-center items-start w-full"
       style="scrollbar-gutter: stable;"
     >
-      <!-- 缩放容器 - 根据可用宽度动态缩放 -->
       <div
         id="share-card-scale-wrapper"
         class="origin-top transition-transform duration-200 shrink-0"
         style="--card-scale: 0.9; transform: scale(var(--card-scale));"
       >
-        <!-- 预览区域 - 分享卡片（固定大尺寸，用于下载） -->
         <div
           id="share-card-container"
           class="bg-white px-6 py-6 sm:px-8 sm:py-7 w-150 flex flex-col gap-5 sm:gap-6 relative rounded-2xl overflow-hidden"
         >
-          <!-- Top Section: 封面 + 标题 + 二维码 -->
           <div class="flex gap-4 sm:gap-6 items-start">
-            <!-- Cover (Logo) -->
             <div class="size-20 sm:size-24 shrink-0 overflow-hidden shadow-lg border border-black/5 bg-[#f0ede8] rounded-lg">
               <img
                 id="share-card-cover"
@@ -82,7 +65,6 @@ import site from "../data/site.json";
               />
             </div>
 
-            <!-- Title & Info -->
             <div class="grow flex flex-col justify-center min-h-20 sm:min-h-24 min-w-0">
               <div
                 class="text-[#3498db] font-serif font-bold text-base tracking-widest mb-2"
@@ -96,7 +78,6 @@ import site from "../data/site.json";
               </h2>
             </div>
 
-            <!-- QR Code -->
             <div class="shrink-0 flex flex-col items-center gap-1.5">
               <div id="share-card-qrcode" class="size-20 flex items-center justify-center"></div>
               <div class="text-[10px] text-gray-400 font-serif tracking-widest text-center">
@@ -105,31 +86,16 @@ import site from "../data/site.json";
             </div>
           </div>
 
-          <!-- Snippet / Description -->
           <div class="relative">
             <p id="share-card-snippet" class="text-sm sm:text-base font-serif text-gray-500 leading-relaxed text-justify line-clamp-3">
             </p>
           </div>
 
-          <!-- Bottom: 时长 + 品牌 -->
           <div
             class="border-t border-gray-200 pt-4 flex justify-between items-center text-gray-400 font-serif"
           >
             <div class="flex items-center gap-2 text-base text-gray-500">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="size-4 sm:size-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="1.5"
-              >
-                <circle cx="12" cy="12" r="9"></circle>
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M12 7v5l3 3"></path>
-              </svg>
+              <i class="ri-time-line text-sm"></i>
               <span id="share-card-duration">00:00:00</span>
             </div>
             <div class="text-xs sm:text-sm tracking-[0.18em] uppercase text-gray-400 text-right">
@@ -145,20 +111,7 @@ import site from "../data/site.json";
         id="download-card-btn"
         class="grow py-3 sm:py-4 bg-[#2d2a26] text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-800 transition-all rounded-xl shadow-md flex items-center justify-center gap-2"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="size-4 sm:size-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-          ></path>
-        </svg>
+        <i class="ri-download-2-line text-sm sm:text-base"></i>
         {site.shareCard.downloadLabel}
       </button>
     </div>
@@ -166,6 +119,8 @@ import site from "../data/site.json";
 </div>
 
 <script>
+  import QRCode from "qrcode";
+
   type ShareModalPayload = {
     title: string;
     cover: string;
@@ -173,7 +128,14 @@ import site from "../data/site.json";
     url: string;
     duration: string;
     episodeId: string;
-    xiaoyuzhouLink: string;
+    link?: string;
+    xiaoyuzhouLink?: string;
+  };
+
+  type ShareModalWindow = Window & {
+    __openShareModal?: (payload: ShareModalPayload) => void;
+    __shareModalClickBound?: boolean;
+    __shareModalResizeBound?: boolean;
   };
 
   function initShareModal() {
@@ -182,19 +144,17 @@ import site from "../data/site.json";
     const modal = document.getElementById("share-modal");
     const content = document.getElementById("share-modal-content");
 
-    // 守卫必须在最顶部：ShareModal 标记了 transition:persist，
-    // 整个脚本只运行一次，但 initShareModal 可能被 astro:page-load 多次调用
-    if (!modal || !content) return;
-    if (modal.dataset.bound === "true") return;
-    modal.dataset.bound = "true";
+    if (!(modal instanceof HTMLDivElement) || !(content instanceof HTMLDivElement)) {
+      return;
+    }
+    const modalEl = modal;
+    const contentEl = content;
+    if (modalEl.dataset.bound === "true") return;
+    modalEl.dataset.bound = "true";
 
     const overlay = document.getElementById("share-modal-overlay");
     const closeBtn = document.getElementById("close-share-modal");
-    const downloadBtn = document.getElementById("download-card-btn");
-    if (
-      !(closeBtn instanceof HTMLButtonElement) ||
-      !(downloadBtn instanceof HTMLButtonElement)
-    ) {
+    if (!(closeBtn instanceof HTMLButtonElement)) {
       return;
     }
 
@@ -216,32 +176,6 @@ import site from "../data/site.json";
     let lastCardHeight = 0;
     let lastScaleValue = "";
 
-    const shareDownloadLabel =
-      modal.dataset.downloadLabel || "下载图片分享";
-    const shareGeneratingLabel =
-      modal.dataset.generatingLabel || "正在生成...";
-    const shareErrorMessage =
-      modal.dataset.errorMessage || "生成失败，请重试";
-    const shareFilenamePrefix =
-      modal.dataset.filenamePrefix || "share";
-    let snapdomModulePromise = null;
-    let qrcodeModulePromise = null;
-
-    const loadSnapdom = async () => {
-      if (!snapdomModulePromise) {
-        snapdomModulePromise = import("@zumer/snapdom");
-      }
-      return snapdomModulePromise;
-    };
-
-    const loadQRCode = async () => {
-      if (!qrcodeModulePromise) {
-        qrcodeModulePromise = import("qrcode");
-      }
-      return qrcodeModulePromise;
-    };
-
-    // 截断文本并添加省略号
     function truncateText(text: string, maxLength: number) {
       if (!text) return "";
       if (text.length <= maxLength) return text;
@@ -256,7 +190,7 @@ import site from "../data/site.json";
       if (e.key !== "Tab") return;
 
       const focusable = Array.from(
-        content.querySelectorAll(
+        contentEl.querySelectorAll(
           "button,[href],input,select,textarea,[tabindex]:not([tabindex='-1'])",
         ),
       ).filter((el): el is HTMLElement => el instanceof HTMLElement && !el.hasAttribute("disabled"));
@@ -275,7 +209,7 @@ import site from "../data/site.json";
       }
     };
 
-    function setInteractiveState(root, enabled) {
+    function setInteractiveState(root: HTMLElement, enabled: boolean) {
       if (!(root instanceof HTMLElement)) return;
       const interactive = root.querySelectorAll(
         "button, a[href], input, select, textarea, [tabindex]",
@@ -306,18 +240,17 @@ import site from "../data/site.json";
 
     function setModalOpen(isOpen: boolean) {
       if (isOpen) {
-        modal.hidden = false;
+        modalEl.hidden = false;
       }
-      modal.classList.toggle("opacity-0", !isOpen);
-      modal.classList.toggle("pointer-events-none", !isOpen);
-      content.classList.toggle("scale-95", !isOpen);
-      modal.setAttribute("aria-hidden", String(!isOpen));
-      modal.toggleAttribute("inert", !isOpen);
-      setInteractiveState(content, isOpen);
+      modalEl.classList.toggle("opacity-0", !isOpen);
+      modalEl.classList.toggle("pointer-events-none", !isOpen);
+      contentEl.classList.toggle("scale-95", !isOpen);
+      modalEl.setAttribute("aria-hidden", String(!isOpen));
+      modalEl.toggleAttribute("inert", !isOpen);
+      setInteractiveState(contentEl, isOpen);
       document.body.style.overflow = isOpen ? "hidden" : "";
 
       if (isOpen) {
-        // 记录并恢复焦点，保证键盘用户可用
         lastActiveElement =
           document.activeElement instanceof HTMLElement
             ? document.activeElement
@@ -328,23 +261,51 @@ import site from "../data/site.json";
         document.removeEventListener("keydown", handleKeydown);
         lastActiveElement?.focus();
         window.setTimeout(() => {
-          modal.hidden = true;
+          modalEl.hidden = true;
         }, 300);
       }
     }
 
-    function buildEpisodeUrl(data: ShareModalPayload) {
-      return (
-        data.xiaoyuzhouLink ||
-        `https://www.xiaoyuzhoufm.com/episode/${data.episodeId}`
-      );
+    function buildEpisodeUrl(data: ShareModalPayload): string {
+      const link = (data.link || data.xiaoyuzhouLink || "").trim();
+      const id = (data.episodeId || "").trim();
+      if (/^https?:\/\//i.test(link)) {
+        if (id.startsWith("netease-") && link.includes("xiaoyuzhoufm.com")) {
+          const neteaseId = id.replace(/^netease-/, "");
+          return `https://music.163.com/program?id=${neteaseId}`;
+        }
+        if ((id.startsWith("xm-") || id.startsWith("ximalaya-")) && link.includes("xiaoyuzhoufm.com")) {
+          const xmId = id.replace(/^(?:xm-|ximalaya-)/, "");
+          return `https://www.ximalaya.com/sound/${xmId}`;
+        }
+        return link;
+      }
+      const neteaseMatch = id.match(/^netease-(\d+)/) || link.match(/netease-(\d+)/) || link.match(/[?&]id=(\d+)/);
+      if (neteaseMatch) {
+        return `https://music.163.com/program?id=${neteaseMatch[1]}`;
+      }
+
+      const xmMatch = id.match(/^(?:xm-|ximalaya-)(\d+)/) || link.match(/sound\/(\d+)/);
+      if (xmMatch) {
+        return `https://www.ximalaya.com/sound/${xmMatch[1]}`;
+      }
+
+      const xyzMatch = id.match(/^xyz-([a-zA-Z0-9]+)/) || link.match(/\/episode\/([a-zA-Z0-9]+)/);
+      if (xyzMatch) {
+        return `https://www.xiaoyuzhoufm.com/episode/${xyzMatch[1]}`;
+      }
+      if (/^[a-f0-9]{24}$/i.test(id)) {
+        return `https://www.xiaoyuzhoufm.com/episode/${id}`;
+      }
+      const origin = typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "";
+      const path = link.startsWith("/") ? link : `/episodes/${id}`;
+      return origin ? `${origin}${path}` : path;
     }
 
-    async function openModal(data) {
-      if (!modal || !content) return;
-
+    async function openModal(data: ShareModalPayload) {
       if (cardTitle instanceof HTMLElement) cardTitle.textContent = data.title;
-      // 截断描述文本，避免过长溢出
       if (cardSnippet)
         cardSnippet.textContent = truncateText(data.snippet, SNIPPET_LIMIT);
       if (cardCover instanceof HTMLImageElement && data.cover)
@@ -352,35 +313,30 @@ import site from "../data/site.json";
       if (cardDuration instanceof HTMLElement && data.duration)
         cardDuration.textContent = data.duration;
 
-      // 使用小宇宙真实链接
+      setModalOpen(true);
+      if (qrcodeContainer) {
+        qrcodeContainer.innerHTML = "";
+      }
+
       const episodeUrl = buildEpisodeUrl(data);
 
-      // QR Code - 使用小宇宙真实链接
-      if (qrcodeContainer) {
-        const { default: QRCode } = await loadQRCode();
-        qrcodeContainer.innerHTML = "";
-        const canvas = document.createElement("canvas");
-        QRCode.toCanvas(
-          canvas,
-          episodeUrl,
-          {
+      try {
+        if (qrcodeContainer) {
+          const canvas = document.createElement("canvas");
+          await QRCode.toCanvas(canvas, episodeUrl, {
             width: 80,
             margin: 2,
             color: {
               dark: "#2d2a26",
               light: "#ffffff",
             },
-          },
-          (error: Error | null | undefined) => {
-            if (!error) {
-              qrcodeContainer.appendChild(canvas);
-              requestAnimationFrame(updateCardScale);
-            }
-          },
-        );
+          });
+          qrcodeContainer.appendChild(canvas);
+        }
+      } catch (error) {
+        console.error("Failed to render QR code", error);
       }
 
-      setModalOpen(true);
       if (cardCover instanceof HTMLImageElement) {
         cardCover.onload = () => updateCardScale();
       }
@@ -396,9 +352,13 @@ import site from "../data/site.json";
       setTimeout(updateCardScale, 80);
     }
 
+    const shareWindow = window as ShareModalWindow;
+    shareWindow.__openShareModal = (payload) => {
+      void openModal(payload);
+    };
+
     function closeModal() {
       setModalOpen(false);
-      // 清理 ResizeObserver 防止内存泄漏
       if (resizeObserver) {
         resizeObserver.disconnect();
         resizeObserver = null;
@@ -447,7 +407,6 @@ import site from "../data/site.json";
       scaleWrapper.style.transform = `scale(${scaleValue})`;
       scaleWrapper.style.width = `${cardWidth}px`;
       scaleWrapper.style.height = `${cardHeight}px`;
-      // 使用负边距消除缩放后的额外空间
       const extraHeight = cardHeight - scaledHeight;
       scaleWrapper.style.marginBottom = extraHeight > 0 ? `-${extraHeight}px` : "0px";
 
@@ -456,51 +415,8 @@ import site from "../data/site.json";
 
     closeBtn?.addEventListener("click", closeModal);
     overlay?.addEventListener("click", closeModal);
-
-    // 监听模块级委托触发的自定义事件
-    document.addEventListener("share-modal:open", (e: Event) => {
-      openModal((e as CustomEvent<ShareModalPayload>).detail);
-    });
-
-    downloadBtn?.addEventListener("click", async () => {
-      if (!cardContainer || !downloadBtn) return;
-
-      try {
-        downloadBtn.textContent = shareGeneratingLabel;
-        downloadBtn.disabled = true;
-
-        // 下载前临时移除圆角以生成没有圆角的直角图片
-        cardContainer.classList.remove("rounded-2xl", "overflow-hidden");
-
-        // 使用 snapdom 生成并下载图片
-        const safeTitle = cardTitle?.textContent?.substring(0, 10) || "";
-        const filename = safeTitle
-          ? `${shareFilenamePrefix}-${safeTitle}`
-          : shareFilenamePrefix;
-        const { snapdom } = await loadSnapdom();
-        await snapdom.download(cardContainer, {
-          filename,
-          scale: 3,
-        });
-      } catch (error: unknown) {
-        console.error("Failed to generate image", error);
-        alert(shareErrorMessage);
-      } finally {
-        // 下载完成后，百分之百恢复网页预览的圆角卡片效果
-        cardContainer.classList.add("rounded-2xl", "overflow-hidden");
-
-        downloadBtn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-          </svg>
-          ${shareDownloadLabel}
-        `;
-        downloadBtn.disabled = false;
-      }
-    });
   }
 
-  // ===== 模块级单例事件注册（只注册一次，终身有效）=====
   const scheduleShareInit = () => {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", initShareModal);
@@ -512,52 +428,134 @@ import site from "../data/site.json";
   scheduleShareInit();
   document.addEventListener("astro:page-load", initShareModal);
 
-  // window resize：模块级单例，不在 initShareModal 内重复注册
-  window.addEventListener("resize", () => {
+  const shareWindow = window as ShareModalWindow;
+
+  if (!shareWindow.__shareModalResizeBound) {
+    shareWindow.__shareModalResizeBound = true;
+    window.addEventListener(
+      "resize",
+      () => {
+        const modal = document.getElementById("share-modal");
+        if (!modal || modal.classList.contains("opacity-0")) return;
+        const scaleWrapper = document.getElementById("share-card-scale-wrapper");
+        const cardContainer = document.getElementById("share-card-container");
+        const scrollContainer = document.getElementById("share-card-scroll-container");
+        if (!scaleWrapper || !cardContainer || !scrollContainer) return;
+
+        const totalWidth = scrollContainer.offsetWidth;
+        const cardWidth = cardContainer.offsetWidth;
+        const cardHeight = cardContainer.offsetHeight;
+        if (!totalWidth || !cardWidth || !cardHeight) return;
+
+        const widthScale = Math.max(0, totalWidth - 8) / cardWidth;
+        const scale = Math.min(1, widthScale);
+        const scaleValue = scale.toFixed(3);
+        const scaledHeight = Math.ceil(cardHeight * scale);
+        const extraHeight = cardHeight - scaledHeight;
+
+        scaleWrapper.style.setProperty("--card-scale", scaleValue);
+        scaleWrapper.style.transform = `scale(${scaleValue})`;
+        scaleWrapper.style.width = `${cardWidth}px`;
+        scaleWrapper.style.height = `${cardHeight}px`;
+        scaleWrapper.style.marginBottom = extraHeight > 0 ? `-${extraHeight}px` : "0px";
+      },
+      { passive: true },
+    );
+  }
+
+  if (!shareWindow.__shareModalClickBound) {
+    shareWindow.__shareModalClickBound = true;
+    document.addEventListener("click", (e: MouseEvent) => {
+      const target = e.target;
+      const btn = target instanceof Element ? target.closest(".share-button") : null;
+      if (!btn) return;
+
+      const payload: ShareModalPayload = {
+        title: btn.getAttribute("data-title") || "",
+        cover: btn.getAttribute("data-cover") || "",
+        snippet: btn.getAttribute("data-snippet") || "",
+        url: btn.getAttribute("data-audio") || "",
+        duration: btn.getAttribute("data-duration") || "00:00:00",
+        episodeId: btn.getAttribute("data-id") || "",
+        link: btn.getAttribute("data-link") || "",
+        xiaoyuzhouLink: btn.getAttribute("data-link") || "",
+      };
+      if (typeof shareWindow.__openShareModal !== "function") {
+        initShareModal();
+      }
+      shareWindow.__openShareModal?.(payload);
+    });
+  }
+</script>
+
+<script>
+  import { snapdom } from "@zumer/snapdom";
+
+  type ShareModalDownloadWindow = Window & {
+    __shareModalDownloadBound?: boolean;
+  };
+
+  function initShareModalDownload() {
     const modal = document.getElementById("share-modal");
-    if (!modal || modal.classList.contains("opacity-0")) return;
-    // 通过自定义事件触发 updateCardScale（只需要调用一个轻量路径）
-    const scaleWrapper = document.getElementById("share-card-scale-wrapper");
+    const downloadBtn = document.getElementById("download-card-btn");
     const cardContainer = document.getElementById("share-card-container");
-    const scrollContainer = document.getElementById("share-card-scroll-container");
-    if (!scaleWrapper || !cardContainer || !scrollContainer) return;
+    const cardTitle = document.getElementById("share-card-title");
+    if (
+      !(modal instanceof HTMLDivElement) ||
+      !(downloadBtn instanceof HTMLButtonElement) ||
+      !(cardContainer instanceof HTMLDivElement)
+    ) {
+      return;
+    }
 
-    const totalWidth = scrollContainer.offsetWidth;
-    const cardWidth = cardContainer.offsetWidth;
-    const cardHeight = cardContainer.offsetHeight;
-    if (!totalWidth || !cardWidth || !cardHeight) return;
+    const downloadWindow = window as ShareModalDownloadWindow;
+    if (downloadWindow.__shareModalDownloadBound) return;
+    downloadWindow.__shareModalDownloadBound = true;
 
-    const widthScale = Math.max(0, totalWidth - 8) / cardWidth;
-    const scale = Math.min(1, widthScale);
-    const scaleValue = scale.toFixed(3);
-    const scaledHeight = Math.ceil(cardHeight * scale);
-    const extraHeight = cardHeight - scaledHeight;
+    const shareDownloadLabel = modal.dataset.downloadLabel || "下载图片分享";
+    const shareGeneratingLabel = modal.dataset.generatingLabel || "正在生成...";
+    const shareErrorMessage = modal.dataset.errorMessage || "生成失败，请重试";
+    const shareFilenamePrefix = modal.dataset.filenamePrefix || "share";
 
-    scaleWrapper.style.setProperty("--card-scale", scaleValue);
-    scaleWrapper.style.transform = `scale(${scaleValue})`;
-    scaleWrapper.style.width = `${cardWidth}px`;
-    scaleWrapper.style.height = `${cardHeight}px`;
-    scaleWrapper.style.marginBottom = extraHeight > 0 ? `-${extraHeight}px` : "0px";
-  }, { passive: true });
+    downloadBtn.addEventListener("click", async () => {
+      try {
+        downloadBtn.textContent = shareGeneratingLabel;
+        downloadBtn.disabled = true;
+        cardContainer.classList.remove("rounded-2xl", "overflow-hidden");
 
-  // 分享按钮点击委托：模块级单例
-  document.addEventListener("click", (e: MouseEvent) => {
-    const target = e.target;
-    const btn = target instanceof Element ? target.closest(".share-button") : null;
-    if (!btn) return;
+        const safeTitle = cardTitle?.textContent?.substring(0, 10) || "";
+        const filename = safeTitle
+          ? `${shareFilenamePrefix}-${safeTitle}`
+          : shareFilenamePrefix;
 
-    // 确保 modal 已初始化（shareModal 内的 openModal 挂载在闭包里，需要通过 initShareModal 触发）
-    // 这里使用 CustomEvent 通知内部处理
-    const title = btn.getAttribute("data-title") || "";
-    const cover = btn.getAttribute("data-cover") || "";
-    const snippet = btn.getAttribute("data-snippet") || "";
-    const audioUrl = btn.getAttribute("data-audio") || "";
-    const duration = btn.getAttribute("data-duration") || "00:00:00";
-    const episodeId = btn.getAttribute("data-id") || "";
-    const xiaoyuzhouLink = btn.getAttribute("data-link") || "";
+        await snapdom.download(cardContainer, {
+          filename,
+          scale: 3,
+        });
+      } catch (error: unknown) {
+        console.error("Failed to generate image", error);
+        window.toast?.error(shareErrorMessage);
+      } finally {
+        cardContainer.classList.add("rounded-2xl", "overflow-hidden");
+        downloadBtn.innerHTML = `
+          <i class="ri-download-2-line text-sm sm:text-base mr-1.5"></i>
+          ${shareDownloadLabel}
+        `;
+        downloadBtn.disabled = false;
+      }
+    });
+  }
 
-    document.dispatchEvent(new CustomEvent("share-modal:open", {
-      detail: { title, cover, snippet, url: audioUrl, duration, episodeId, xiaoyuzhouLink },
-    }));
-  });
+  const scheduleShareModalDownload = () => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initShareModalDownload, {
+        once: true,
+      });
+      return;
+    }
+    initShareModalDownload();
+  };
+
+  scheduleShareModalDownload();
+  document.addEventListener("astro:page-load", initShareModalDownload);
 </script>

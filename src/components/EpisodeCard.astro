@@ -1,21 +1,23 @@
 ---
-import site from "../data/site.json";
+import { loadSiteConfig } from "../../scripts/siteConfig.js";
+import { formatEpisodeDate, extractEpisodeNumber, estimateFileSize } from "../utils/episodes";
+const site = loadSiteConfig();
 
 const { episode, compact = false } = Astro.props;
 
-const formattedDate = new Date(episode.pubDate).toLocaleDateString("zh-CN", {
+const formattedDate = formatEpisodeDate(episode.pubDate, {
   year: "numeric",
   month: "long",
   day: "numeric",
 });
 
-const fileSize = episode.enclosure?.length
-  ? (parseInt(episode.enclosure.length) / (1024 * 1024)).toFixed(1) + " MB"
-  : site.ui.unknownSizeLabel;
+const enclosureBytes = parseInt(episode.enclosure?.length || "0", 10);
+const fileSize = enclosureBytes > 0
+  ? `${(enclosureBytes / (1024 * 1024)).toFixed(1)} MB`
+  : (estimateFileSize(episode.itunes?.duration) || site.ui.unknownSizeLabel);
 
 const coverImage = episode.itunes?.image || site.assets.defaultCover;
-const episodeNumber =
-  episode.itunes?.episode || site.ui.episodeNumberFallbackLabel;
+const episodeNumber = extractEpisodeNumber(episode, site.ui.episodeNumberFallbackLabel);
 const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
 ---
 
@@ -25,14 +27,12 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
   data-id={episode.id}
   data-compact={compact ? "true" : "false"}
 >
-  <!-- 主内容区：图片 + 信息 -->
     <div
       class:list={[
         "flex gap-3 sm:gap-4 p-3 sm:p-4 items-stretch",
         compact ? "items-stretch" : "items-start",
       ]}
     >
-    <!-- 封面图：小屏幕自适应，大屏幕固定尺寸 -->
     <div
       class:list={[
         "shrink-0 flex-none self-start overflow-hidden bg-[#f0ede8] border border-[#2d2a26]/5 shadow-inner rounded-xl aspect-square",
@@ -51,10 +51,8 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
       />
     </div>
 
-    <!-- 右侧信息 -->
     <div class="grow flex flex-col justify-between min-w-0 py-0.5" data-card-content>
       <div>
-        <!-- 期号 + 日期 -->
         <div
           class:list={[
             "flex flex-wrap items-center gap-2",
@@ -69,7 +67,6 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
           <span class="text-[10px] font-serif text-[#6f685f]">{formattedDate}</span>
         </div>
 
-        <!-- 标题（最多2行） -->
         <h3
           class:list={[
             "font-bold group-hover:text-orange-800 transition-colors leading-snug",
@@ -84,7 +81,6 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
           <a href={`/episodes/${episode.id}`} data-card-title-link={episode.id}>{episode.title}</a>
         </h3>
 
-        <!-- 描述（仅完整版显示） -->
         {
           episode.contentSnippet && (
             <p
@@ -102,7 +98,6 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
         }
       </div>
 
-      <!-- 标签 -->
       {
         episode.tags && episode.tags.length > 0 && (
           <div
@@ -127,24 +122,11 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
     </div>
   </div>
 
-  <!-- 底部操作栏 -->
   <div
     class="flex items-center justify-between gap-2 flex-nowrap px-3 sm:px-4 py-3 border-t border-[#2d2a26]/5 bg-[#fafaf9]"
   >
     <div class="flex items-center gap-x-2 text-[10px] sm:text-[11px] font-serif text-[#6f685f] whitespace-nowrap">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="size-3.5 sm:size-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
+      <i class="ri-time-line text-xs"></i>
       <span>{episode.itunes?.duration || site.ui.unknownDurationLabel}</span>
       <span class="w-1 h-1 bg-current rounded-full opacity-30 mx-1"></span>
       <span>{fileSize}</span>
@@ -159,20 +141,7 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
         title={site.ui.downloadLabel}
         data-filename={`${episode.title}.m4a`}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="size-4 sm:size-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-          ></path>
-        </svg>
+        <i class="ri-download-2-line text-sm"></i>
       </a>
       <button
         class="share-button p-1.5 text-[#2d2a26] opacity-40 hover:opacity-100 hover:bg-[#2d2a26]/5 rounded-lg transition-all"
@@ -185,38 +154,16 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
         data-id={episode.id}
         data-link={episode.link}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="size-4 sm:size-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-          ></path>
-        </svg>
+        <i class="ri-share-line text-sm"></i>
       </button>
-
       <button
         class="play-button flex items-center gap-1 px-2.5 py-1.5 sm:gap-1.5 sm:px-3 sm:py-1.5 bg-[#2d2a26] text-white text-[10px] font-serif font-bold uppercase tracking-widest hover:bg-orange-800 transition-all rounded-lg shadow-sm hover:shadow-md active:scale-95"
         data-title={episode.title}
         data-audio={episode.enclosure?.url}
         data-cover={coverImage}
+        data-episode-id={episode.id}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="size-2.5 sm:size-3 translate-x-0.5"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-        >
-          <path
-            d="M7 4.406c0-.853.947-1.354 1.649-.865l10.211 7.112c.621.432.621 1.34 0 1.772l-10.211 7.112c-.702.489-1.649-.012-1.649-.865V4.406z"
-          ></path>
-        </svg>
+        <i class="ri-play-fill text-xs translate-x-0.5"></i>
         <span>{site.ui.playLabel}</span>
       </button>
     </div>
@@ -225,9 +172,11 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
 
 <script>
   const initEpisodeCardTitleFit = () => {
-    const win = window as any;
-    if (win.__episodeCardTitleFitInitialized) return;
-    win.__episodeCardTitleFitInitialized = true;
+    const cardWindow = window as Window & {
+      __episodeCardTitleFitInitialized?: boolean;
+    };
+    if (cardWindow.__episodeCardTitleFitInitialized) return;
+    cardWindow.__episodeCardTitleFitInitialized = true;
 
     const SELECTORS = {
       card: "[data-episode-card]",
@@ -254,7 +203,6 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
       const allCards = Array.from(document.querySelectorAll(SELECTORS.card));
       allCards.forEach(resetCardLayout);
 
-      // 移动端不做标题缩放，保持可读性
       if (window.innerWidth < MIN_WIDTH) return;
 
       const cards = allCards.filter(
@@ -332,4 +280,29 @@ const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
   };
 
   initEpisodeCardTitleFit();
+
+  const initPlayTracking = () => {
+    const cardWindow = window as Window & {
+      __episodePlayTrackingInitialized?: boolean;
+    };
+    if (cardWindow.__episodePlayTrackingInitialized) return;
+    cardWindow.__episodePlayTrackingInitialized = true;
+
+    document.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement | null;
+      const btn = target?.closest(".play-button") as HTMLElement | null;
+      if (!btn) return;
+      const card = btn.closest("[data-episode-card]") as HTMLElement | null;
+      const episodeId = btn.getAttribute("data-episode-id") || card?.getAttribute("data-id");
+      if (!episodeId) return;
+
+      fetch("/api/play", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeId }),
+      }).catch(() => {});
+    });
+  };
+
+  initPlayTracking();
 </script>

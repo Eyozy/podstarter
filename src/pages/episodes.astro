@@ -1,22 +1,18 @@
 ---
 import MainLayout from "../layouts/MainLayout.astro";
 import EpisodeCard from "../components/EpisodeCard.astro";
-import episodes from "../data/episodes.json";
+import { publishedEpisodes, episodeYear } from "../utils/episodes";
 import themes from "../data/themes.json";
-// 页面文案在 site.json 的 pages.episodes 中配置。
-import site from "../data/site.json";
+import { loadSiteConfig } from "../../scripts/siteConfig.js";
+const site = loadSiteConfig();
 
-// AI 功能开关
 const aiEnabled = site.features?.aiTagging === true;
-
-// 获取所有年份
 const years = [
-  ...new Set(episodes.map((ep) => new Date(ep.pubDate).getFullYear())),
+  ...new Set(publishedEpisodes.map((ep) => episodeYear(ep.pubDate))),
 ].sort((a, b) => b - a);
 
-// 获取所有标签并去重（仅在 AI 功能开启时使用）
 const allTags = aiEnabled
-  ? [...new Set(episodes.flatMap((ep) => ep.tags || []))].sort()
+  ? [...new Set(publishedEpisodes.flatMap((ep) => ep.tags || []))].sort()
   : [];
 ---
 
@@ -38,11 +34,10 @@ const allTags = aiEnabled
   </div>
 
   <div class="flex flex-col lg:flex-row gap-6 md:gap-8 lg:gap-12 items-stretch lg:items-start">
-    <!-- 筛选与搜索工具栏 -->
+    {publishedEpisodes.length > 0 && (
     <aside
       class="w-full lg:w-64 xl:w-72 shrink-0 space-y-5 md:space-y-7 lg:space-y-10 z-10 lg:sticky lg:top-24"
     >
-      <!-- 当前主题 (仅当有主题筛选时显示) -->
       <div
         id="active-theme-section"
         class="hidden bg-orange-50 p-4 sm:p-5 border border-orange-100 rounded-2xl relative group transition-all duration-300"
@@ -61,24 +56,11 @@ const allTags = aiEnabled
             class="text-orange-800/40 hover:text-orange-800 hover:bg-orange-800/5 p-2 rounded-full transition-all"
             title={site.pages.episodes.clearThemeTitle}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="size-4 sm:size-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
+            <i class="ri-close-line text-base sm:text-lg"></i>
           </button>
         </div>
       </div>
 
-      <!-- 搜索框 -->
       <div
         class="bg-white/50 lg:bg-transparent p-4 md:p-5 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none"
       >
@@ -103,37 +85,13 @@ const allTags = aiEnabled
               class="text-[#2d2a26] opacity-20 hover:opacity-100 transition-opacity hidden"
               title={site.pages.episodes.searchClearTitle}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="size-4 sm:size-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
+              <i class="ri-close-line text-base sm:text-lg"></i>
             </button>
             <div
               id="search-icon"
               class="text-[#2d2a26] opacity-20 group-focus-within:opacity-100 transition-opacity pointer-events-none"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="size-4 sm:size-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-              </svg>
+              <i class="ri-search-line text-base sm:text-lg"></i>
             </div>
           </div>
         </div>
@@ -141,27 +99,13 @@ const allTags = aiEnabled
           id="search-count"
           class="mt-3 md:mt-4 text-[10px] font-serif opacity-40 italic hidden items-center gap-2 px-1"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="size-3 sm:size-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            ></path>
-          </svg>
+          <i class="ri-information-line text-xs"></i>
           {site.pages.episodes.searchCountPrefix}{" "}
           <span id="count-num" class="font-bold">0</span>{" "}
           {site.pages.episodes.searchCountSuffix}
         </p>
       </div>
 
-      <!-- 按年份筛选 -->
       <div
         class="bg-white/50 lg:bg-transparent p-4 md:p-5 lg:p-0 border border-[#2d2a26]/5 lg:border-none rounded-2xl shadow-sm lg:shadow-none backdrop-blur-md lg:backdrop-blur-none lg:pt-8 lg:border-t lg:border-[#2d2a26]/5"
       >
@@ -234,39 +178,25 @@ const allTags = aiEnabled
               class="mt-3 text-[10px] font-serif text-orange-800/60 hover:text-orange-800 transition-colors flex items-center gap-1"
             >
               <span id="toggle-tags-text">{site.pages.episodes.toggleTagsExpandLabel}</span>
-              <svg
-                id="toggle-tags-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                class="size-3 sm:size-3.5 transition-transform"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                ></path>
-              </svg>
+              <i id="toggle-tags-icon" class="ri-arrow-down-s-line text-sm transition-transform"></i>
             </button>
           )}
         </div>
       </div>
       )}
     </aside>
+    )}
 
-    <!-- 节目列表 -->
     <div
       class="flex-1 min-w-0 space-y-4 md:space-y-6 lg:space-y-8 w-full"
       id="episodes-container"
     >
       {
-        episodes.map((episode) => (
+        publishedEpisodes.map((episode) => (
           <div
             class="episode-item"
             data-id={episode.id}
-            data-year={new Date(episode.pubDate).getFullYear()}
+            data-year={episodeYear(episode.pubDate)}
             data-theme={episode.themeId}
             data-tags={JSON.stringify(episode.tags || [])}
             data-title={episode.title.toLowerCase()}
@@ -276,28 +206,51 @@ const allTags = aiEnabled
           </div>
         ))
       }
-      <!-- 无搜索结果提示 -->
-      <div
-        id="no-results"
-        class="hidden py-20 sm:py-24 md:py-32 text-center border-2 border-dashed border-[#2d2a26]/5 rounded-2xl bg-white/20 px-6"
-      >
-        <p class="text-xl opacity-40 font-serif italic mb-2">
-          {site.pages.episodes.emptyTitle}
-        </p>
-        <p class="text-sm opacity-30 font-serif">
-          {site.pages.episodes.emptySubtitle}
-        </p>
-      </div>
+      {publishedEpisodes.length === 0 ? (
+        <div class="py-16 sm:py-24 text-center border border-dashed border-[#2d2a26]/15 rounded-2xl bg-white/40 p-6 sm:p-10 w-full">
+          <div class="size-12 rounded-full bg-orange-50 border border-orange-200 text-orange-800 flex items-center justify-center mx-auto mb-4">
+            <i class="ri-mic-line text-2xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-[#2d2a26] mb-1">暂无已发布节目</h3>
+          <p class="text-xs sm:text-sm text-[#2d2a26]/60 font-serif leading-relaxed max-w-sm mx-auto mb-6">
+            欢迎使用 PodStarter！你可以前往管理控制台直接粘贴 RSS 地址一键同步，快速导入你的第一期播客。
+          </p>
+          <a
+            href="/admin"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2d2a26] text-white text-xs font-mono font-bold hover:bg-orange-800 transition-colors shadow-sm"
+          >
+            <i class="ri-settings-3-line text-sm"></i>
+            <span>前往管理控制台一键导入</span>
+          </a>
+        </div>
+      ) : (
+        <div
+          id="no-results"
+          class="hidden py-20 sm:py-24 md:py-32 text-center border-2 border-dashed border-[#2d2a26]/5 rounded-2xl bg-white/20 px-6"
+        >
+          <p class="text-xl opacity-40 font-serif italic mb-2">
+            {site.pages.episodes.emptyTitle}
+          </p>
+          <p class="text-sm opacity-30 font-serif">
+            {site.pages.episodes.emptySubtitle}
+          </p>
+        </div>
+      )}
     </div>
   </div>
 </MainLayout>
 
-<script define:vars={{ themes }}>
+<script is:inline define:vars={{ themes }}>
   window.themesData = themes;
 </script>
 
-<script define:vars={{ toggleTagsExpandLabel: site.pages.episodes.toggleTagsExpandLabel, toggleTagsCollapseLabel: site.pages.episodes.toggleTagsCollapseLabel, pagefindBaseUrl: `${Astro.site?.pathname || "/"}pagefind/pagefind.js`, pagefindEnabled: !import.meta.env.DEV }}>
+<script is:inline define:vars={{ toggleTagsExpandLabel: site.pages.episodes.toggleTagsExpandLabel, toggleTagsCollapseLabel: site.pages.episodes.toggleTagsCollapseLabel, pagefindBaseUrl: `${Astro.site?.pathname || "/"}pagefind/pagefind.js`, pagefindEnabled: !import.meta.env.DEV }}>
   function initSearch() {
+    const container = document.getElementById("episodes-container");
+    if (!(container instanceof HTMLElement)) return;
+    if (container.dataset.searchBound === "true") return;
+    container.dataset.searchBound = "true";
+
     const searchInput = document.getElementById("search-input");
     const searchInputEl =
       searchInput instanceof HTMLInputElement ? searchInput : null;
@@ -309,12 +262,10 @@ const allTags = aiEnabled
     const clearBtn = document.getElementById("search-clear-btn");
     const searchIcon = document.getElementById("search-icon");
 
-    // 主题筛选相关元素
     const activeThemeSection = document.getElementById("active-theme-section");
     const activeThemeTitle = document.getElementById("active-theme-title");
     const clearThemeBtn = document.getElementById("clear-theme-btn");
 
-    // 标签筛选相关元素
     const tagButtons = document.querySelectorAll(".tag-filter");
     const clearTagBtn = document.getElementById("clear-tag-btn");
     const toggleTagsBtn = document.getElementById("toggle-tags-btn");
@@ -329,7 +280,6 @@ const allTags = aiEnabled
       tagsExpanded: false,
     };
 
-    // 缓存所有卡片的原始文本/链接和 snippet 的 className，以防检索清除后无法复原 (KISS 经典还原模式)
     const originalContent = new Map();
     episodeItems.forEach((item) => {
       if (!(item instanceof HTMLElement)) return;
@@ -341,12 +291,10 @@ const allTags = aiEnabled
       originalContent.set(id, {
         snippetHTML: snippetEl ? snippetEl.innerHTML : "",
         titleHTML: titleLinkEl ? titleLinkEl.innerHTML : "",
-        // 缓存 line-clamp 等 className，搜索命中时移除、清除时还原
         snippetClass: snippetEl ? snippetEl.className : "",
       });
     });
 
-    // 异步加载 Pagefind 引擎与降级保障
     let pagefind = null;
     const loadPagefind = async () => {
       if (!pagefindEnabled) {
@@ -359,19 +307,16 @@ const allTags = aiEnabled
 
       const pagefindBase = pagefindBaseUrl;
       try {
-        // @ts-ignore
         const pf = await import(/* @vite-ignore */ pagefindBase);
         await pf.options({});
         pagefind = pf;
         window.pagefind = pf;
-        console.log("Pagefind 引擎异步加载成功，支持文字稿高亮检索");
       } catch (e) {
         console.warn("未检测到 Pagefind 静态索引，降级使用原生字符匹配检索:", e);
       }
     };
     loadPagefind();
 
-    // 样式常量
     const activeClasses = ["bg-[#2d2a26]", "text-white", "hover:text-white"];
     const inactiveClasses = [
       "border",
@@ -382,7 +327,6 @@ const allTags = aiEnabled
       "hover:border-[#2d2a26]",
     ];
 
-    // 标签样式常量
     const tagActiveClasses = [
       "bg-[#2d2a26]",
       "text-white",
@@ -433,7 +377,6 @@ const allTags = aiEnabled
       }
     };
 
-    // 辅助工具：高亮普通字符并添加 mark 标签
     const highlightRawText = (text, keyword) => {
       if (!keyword) return text;
       const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -472,7 +415,6 @@ const allTags = aiEnabled
     }) => {
       if (!query) {
         return {
-          kind: "default",
           snippetHtml: snippetText,
           titleHtml: title,
         };
@@ -487,14 +429,12 @@ const allTags = aiEnabled
       if (!excerptHtml) {
         if (queryIndex >= visibleThreshold) {
           return {
-            kind: "fallback-snippet-excerpt",
             snippetHtml: `<span class="transcript-badge">节目介绍</span>${buildManualExcerpt(snippetText, query)}`,
             titleHtml,
           };
         }
 
         return {
-          kind: "fallback-inline",
           snippetHtml: highlightRawText(snippetText, query),
           titleHtml,
         };
@@ -502,7 +442,6 @@ const allTags = aiEnabled
 
       if (!lowerTitle.includes(lowerQuery) && !lowerSnippet.includes(lowerQuery)) {
         return {
-          kind: "transcript-only",
           snippetHtml: `<span class="transcript-badge">文字稿</span>${excerptHtml}`,
           titleHtml,
         };
@@ -510,20 +449,17 @@ const allTags = aiEnabled
 
       if (queryIndex >= visibleThreshold) {
         return {
-          kind: "snippet-excerpt",
           snippetHtml: `<span class="transcript-badge">节目介绍</span>${excerptHtml}`,
           titleHtml,
         };
       }
 
       return {
-        kind: "snippet-inline",
         snippetHtml: highlightRawText(snippetText, query),
         titleHtml,
       };
     };
 
-    // 静态搜索备用函数
     const fallbackIncludesSearch = (query, matchedIds) => {
       episodeItems.forEach((item) => {
         if (!(item instanceof HTMLElement)) return;
@@ -536,7 +472,6 @@ const allTags = aiEnabled
       });
     };
 
-    // 自增 ID 用以处理异步竞态问题
     let currentSearchId = 0;
 
     const filterEpisodes = async () => {
@@ -546,11 +481,9 @@ const allTags = aiEnabled
       let matchedIds = new Set();
       let excerpts = new Map();
 
-      // 执行异步 Pagefind 检索
       if (query !== "" && pagefind) {
         try {
           const search = await pagefind.search(query);
-          // 在等待异步数据完成的间隙中，如果用户已经进行了新的输入，立即舍弃旧的结果
           if (searchId !== currentSearchId) return;
 
           const results = await Promise.all(search.results.map((r) => r.data()));
@@ -569,11 +502,9 @@ const allTags = aiEnabled
           fallbackIncludesSearch(query, matchedIds);
         }
       } else if (query !== "") {
-        // 无 Pagefind，降级
         fallbackIncludesSearch(query, matchedIds);
       }
 
-      // 如果有竞态输入，中断
       if (searchId !== currentSearchId) return;
 
       episodeItems.forEach((item) => {
@@ -618,7 +549,6 @@ const allTags = aiEnabled
               titleLinkEl.innerHTML = presentation.titleHtml;
             }
           } else if (original) {
-            // 清除搜索时，还原卡片原始结构（包括无高亮文本）
             if (snippetEl) {
               snippetEl.innerHTML = original.snippetHTML;
             }
@@ -627,7 +557,6 @@ const allTags = aiEnabled
 
         } else {
           item.style.display = "none";
-          // 隐藏时也顺便还原高亮状态，保证状态一致
           const original = originalContent.get(id);
           const snippetEl = item.querySelector(`[data-episode-snippet="${id}"]`);
           const titleLinkEl = item.querySelector(`[data-card-title-link="${id}"]`);
@@ -640,7 +569,6 @@ const allTags = aiEnabled
         }
       });
 
-      // 更新计数
       if (query !== "") {
         searchCount?.classList.remove("hidden");
         searchCount?.classList.add("flex");
@@ -650,8 +578,7 @@ const allTags = aiEnabled
         searchCount?.classList.remove("flex");
       }
 
-      // 更新无结果提示
-      if (visibleCount === 0) {
+      if (query !== "" && visibleCount === 0) {
         noResults?.classList.remove("hidden");
       } else {
         noResults?.classList.add("hidden");
@@ -801,5 +728,14 @@ const allTags = aiEnabled
     filterEpisodes();
   }
 
+  const scheduleSearchInit = () => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initSearch, { once: true });
+      return;
+    }
+    initSearch();
+  };
+
+  scheduleSearchInit();
   document.addEventListener("astro:page-load", initSearch);
 </script>
