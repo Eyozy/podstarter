@@ -93,6 +93,16 @@ try {
   isFsWritable = false;
 }
 
+let currentCommitSha = String(process.env.COMMIT_REF || process.env.COMMIT_SHA || "").trim();
+if (!currentCommitSha) {
+  try {
+    const { execSync } = await import("node:child_process");
+    currentCommitSha = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+  } catch {
+    currentCommitSha = "";
+  }
+}
+const shortCommitSha = currentCommitSha.slice(0, 7);
 const currentVersion = "1.1.0";
 const pageTitle = "管理控制台 | " + site.brand.name;
 ---
@@ -258,21 +268,22 @@ const pageTitle = "管理控制台 | " + site.brand.name;
         </div>
       </div>
 
-      <div id="upstream-version-banner" class="mb-8 p-4 sm:p-5 rounded-2xl border border-orange-200 bg-orange-50/80 text-[#2d2a26] text-xs font-serif flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+      <div id="upstream-version-banner" class="hidden mb-8 p-4 sm:p-5 rounded-2xl border border-orange-200 bg-orange-50/80 text-[#2d2a26] text-xs font-serif flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
         <div class="flex items-center gap-2.5">
           <i class="ri-information-line text-lg text-orange-800 shrink-0"></i>
           <div>
-            <span class="font-bold text-orange-950 font-serif" id="upstream-version-title">检测到 PodStarter 模板有新版本发布！</span>
-            <p class="text-[11px] text-[#2d2a26]/70 mt-0.5 font-serif">你的 GitHub Fork 已配置自动同步工作流，也可在仓库首页点击 “Sync fork” 一键同步更新。</p>
+            <span class="font-bold text-orange-950 font-serif" id="upstream-version-title">检测到 PodStarter 模板有新更新！</span>
+            <p class="text-[11px] text-[#2d2a26]/70 mt-0.5 font-serif" id="upstream-version-desc">你的 GitHub 仓库已配置自动同步工作流，可在仓库 Actions 运行 Upstream Sync 一键同步。</p>
           </div>
         </div>
         <a
-          href="https://github.com/Eyozy/podstarter"
+          id="upstream-version-link"
+          href="https://github.com/Eyozy/podstarter/commits/main"
           target="_blank"
           rel="noopener noreferrer"
           class="inline-flex items-center gap-1 text-orange-900 font-serif font-bold hover:underline text-xs shrink-0 self-start sm:self-auto"
         >
-          <span>查看上游更新日志</span>
+          <span>查看上游更新记录 ↗</span>
         </a>
       </div>
 
@@ -1371,7 +1382,7 @@ const pageTitle = "管理控制台 | " + site.brand.name;
           <span>{isFsWritable ? "本地开发/独立服务器环境（控制台修改即时写盘持久化生效）" : "托管平台部署（只读文件沙盒，修改请在本地完成并通过 git push 触发云端自动构建）"}</span>
         </div>
         <div class="flex items-center gap-4 text-[11px] font-mono">
-          <span>v{currentVersion}</span>
+          <span>v{currentVersion}{shortCommitSha ? ` · ${shortCommitSha}` : ''}</span>
           <a href="https://github.com/Eyozy/podstarter#readme" target="_blank" rel="noopener noreferrer" class="hover:text-orange-800 transition-colors inline-flex items-center gap-1 font-serif text-xs">
             <i class="ri-book-open-line text-sm text-orange-800"></i>
             <span>使用说明与配置 ↗</span>
@@ -1436,7 +1447,7 @@ const pageTitle = "管理控制台 | " + site.brand.name;
   </div>
 </MainLayout>
 
-<script is:inline define:vars={{ initialMembers: site.about?.members || [], initialVersion: currentVersion, envTemplates }}>
+<script is:inline define:vars={{ initialMembers: site.about?.members || [], initialVersion: currentVersion, currentCommitSha: shortCommitSha, envTemplates }}>
   function initAdminConsole() {
     const consoleRoot = document.querySelector("[data-admin-console]");
     if (!consoleRoot || consoleRoot.dataset.bound === "true") return;
@@ -1470,17 +1481,27 @@ const pageTitle = "管理控制台 | " + site.brand.name;
     });
 
     try {
-      fetch("https://api.github.com/repos/Eyozy/podstarter/releases/latest")
-        .then((res) => res.json())
+      fetch("https://api.github.com/repos/Eyozy/podstarter/commits/main")
+        .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (data && data.tag_name) {
-            const upstreamVer = String(data.tag_name).replace(/^v/i, "");
-            if (upstreamVer && upstreamVer !== initialVersion) {
+          if (data && data.sha) {
+            const upstreamSha = String(data.sha).slice(0, 7);
+            const upstreamMsg = data.commit?.message?.split("\n")[0] || "";
+            if (currentCommitSha && upstreamSha && !currentCommitSha.startsWith(upstreamSha) && !upstreamSha.startsWith(currentCommitSha)) {
               const banner = document.getElementById("upstream-version-banner");
               const title = document.getElementById("upstream-version-title");
+              const desc = document.getElementById("upstream-version-desc");
+              const link = document.getElementById("upstream-version-link");
               if (banner && title) {
-                title.textContent = `检测到 PodStarter 模板发布了新版本 v${upstreamVer}（当前 v${initialVersion}）！`;
+                title.innerHTML = `检测到 PodStarter 模板有新更新：<code class="px-1.5 py-0.5 rounded bg-orange-100 font-mono text-[11px] text-orange-950 font-bold">${escapeAttr(upstreamMsg)}</code>`;
+                if (desc) {
+                  desc.textContent = `上游最新提交 (${upstreamSha}) 领先于当前版本 (${currentCommitSha})。可在私有仓库 Actions 运行 Upstream Sync 同步。`;
+                }
+                if (link && data.html_url) {
+                  link.href = data.html_url;
+                }
                 banner.classList.remove("hidden");
+                banner.classList.add("flex");
               }
             }
           }
