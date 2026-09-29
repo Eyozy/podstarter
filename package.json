@@ -1,36 +1,45 @@
 {
   "name": "podstarter",
   "type": "module",
-  "version": "0.0.1",
+  "version": "1.1.0",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "NODE_OPTIONS='--no-network-family-autoselection' astro dev",
     "build": "astro build && npx pagefind --site dist",
-    "test": "node --test tests/*.test.mjs",
     "astro": "astro",
-    "sync": "node scripts/sync-content.js",
-    "reset": "node scripts/reset-data.js",
-    "analyze": "node scripts/analyze-themes.js",
-    "analyze:full": "node scripts/analyze-themes.js --full",
-    "tag": "node scripts/tag-episodes.js",
+    "sync": "NODE_OPTIONS='--no-network-family-autoselection' node scripts/syncContent.js",
+    "init": "node scripts/initProject.js",
+    "test:auth": "node --experimental-strip-types scripts/testAdminAuth.ts",
+    "reset": "node scripts/resetData.js",
+    "transcript": "node scripts/convertTranscript.js",
+    "transcript:convert": "node scripts/convertTranscript.js",
+    "analyze": "NODE_OPTIONS='--no-network-family-autoselection' node scripts/analyzeThemes.js",
+    "analyze:full": "NODE_OPTIONS='--no-network-family-autoselection' node scripts/analyzeThemes.js --full",
+    "tag": "NODE_OPTIONS='--no-network-family-autoselection' node scripts/tagEpisodes.js",
+    "normalize:tags": "node scripts/tagNormalizer.js",
     "smart-build": "npm run sync && npm run build"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.6",
-    "@astrojs/netlify": "^6.6.4",
-    "@astrojs/sitemap": "^3.7.2",
-    "@tailwindcss/vite": "^4.1.18",
-    "@zumer/snapdom": "^2.0.1",
-    "astro": "^5.16.11",
-    "dotenv": "^17.2.3",
-    "isomorphic-dompurify": "^2.35.0",
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/netlify": "^7.0.13",
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "@zumer/snapdom": "^3.2.0",
+    "astro": "^6.4.8",
+    "dotenv": "^18.0.4",
+    "isomorphic-dompurify": "^3.19.0",
+    "marked": "^18.0.14",
     "pagefind": "^1.4.0",
     "qrcode": "^1.5.4",
-    "rehype-external-links": "^3.0.0",
+    "remixicon": "^4.9.1",
     "rss-parser": "^3.13.0",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.6"
+  },
+  "overrides": {
+    "vite": "^7.3.6"
   }
 }

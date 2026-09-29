@@ -1,25 +1,11 @@
 /// <reference types="astro/client" />
 
-declare module "qrcode" {
-  type QRCodeColorOptions = {
-    dark?: string;
-    light?: string;
+interface Window {
+  toast?: {
+    show: (message: string, type?: "info" | "success" | "warning" | "error", duration?: number) => void;
+    success: (message: string, duration?: number) => void;
+    error: (message: string, duration?: number) => void;
+    warning: (message: string, duration?: number) => void;
+    info: (message: string, duration?: number) => void;
   };
-
-  type QRCodeToCanvasOptions = {
-    width?: number;
-    margin?: number;
-    color?: QRCodeColorOptions;
-  };
-
-  const QRCode: {
-    toCanvas(
-      canvasElement: HTMLCanvasElement,
-      text: string,
-      options?: QRCodeToCanvasOptions,
-      callback?: (error: Error | null | undefined) => void,
-    ): Promise<void>;
-  };
-
-  export default QRCode;
 }
