@@ -1,15 +1,7 @@
-/**
- * 共享工具函数，供 tag-episodes.js 和 normalize-tags.js 复用。
- */
+import fs from "node:fs";
+import path from "node:path";
+import readline from "node:readline";
 
-/**
- * 将原始标签列表规范化：去除无效值、应用别名映射、过滤不在白名单内的标签、去重。
- * @param {string[]} rawTags - 原始标签数组
- * @param {Record<string, string>} aliases - 别名映射表（旧名 → 新名）
- * @param {Set<string>} allowedTags - 允许的标签白名单
- * @param {boolean} [stripHash=false] - 是否去除标签前的 # 前缀（normalize-tags 场景需要）
- * @returns {string[]}
- */
 export function normalizeTags(rawTags, aliases, allowedTags, stripHash = false) {
   if (!Array.isArray(rawTags)) {
     return [];
@@ -38,14 +30,6 @@ export function normalizeTags(rawTags, aliases, allowedTags, stripHash = false) 
   return normalized;
 }
 
-/**
- * 用 fallbackTags 补足 primaryTags，确保标签数量在 [minCount, maxCount] 范围内。
- * @param {string[]} primaryTags - 主要标签
- * @param {string[]} fallbackTags - 备用标签（当主要标签不足时补充）
- * @param {number} minCount - 最少标签数
- * @param {number} maxCount - 最多标签数
- * @returns {string[]}
- */
 export function fillTags(primaryTags, fallbackTags, minCount, maxCount) {
   const tags = [...primaryTags];
   for (const tag of fallbackTags) {
@@ -62,4 +46,37 @@ export function fillTags(primaryTags, fallbackTags, minCount, maxCount) {
   }
 
   return tags.length >= minCount ? tags : tags.slice(0, Math.max(minCount, 1));
+}
+
+export function atomicWriteFile(filePath, content) {
+  const tempPath = `${filePath}.${process.pid}.tmp`;
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  try {
+    fs.writeFileSync(tempPath, content, "utf-8");
+    fs.renameSync(tempPath, filePath);
+  } catch (err) {
+    fs.rmSync(tempPath, { force: true });
+    throw err;
+  }
+}
+
+export function atomicWriteJson(filePath, data) {
+  atomicWriteFile(filePath, JSON.stringify(data, null, 2) + "\n");
+}
+
+export function askUserConfirm(question, defaultOnNonTTY = true) {
+  if (!process.stdin.isTTY) {
+    console.log(`${question} [非交互环境，默认选择：${defaultOnNonTTY ? "Y" : "N"}]`);
+    return Promise.resolve(defaultOnNonTTY);
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      resolve(normalized === "" || normalized === "y" || normalized === "yes");
+    });
+  });
 }

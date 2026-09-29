@@ -1,27 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { askAI } from "./ai-client.js";
-import { isAiEnabled, loadSiteConfig } from "./site-config.js";
-import { normalizeTags, fillTags } from "./utils.js";
-
-// 用途：
-// 1. 读取现有的 src/data/themes.json
-// 2. 让 AI 为单集节目选择 themeId，并生成 2-3 个标签
-// 3. 回写到 src/data/episodes.json
-//
-// 对应命令：
-// - npm run tag
-//   默认一次只处理 5 期未打标节目
-// - node scripts/tag-episodes.js --limit 20
-//   一次处理更多未打标节目
-// - node scripts/tag-episodes.js --ids id1,id2
-//   只处理指定节目
-//
-// 注意：
-// - 这个脚本依赖已存在的 themes.json 和 tag-taxonomy.json
-// - 这个脚本负责“给节目写入 themeId / tags”
-// - 不负责生成主题分类体系
+import { askAI } from "./aiClient.js";
+import { isAiEnabled, loadSiteConfig } from "./siteConfig.js";
+import { normalizeTags, fillTags, atomicWriteJson } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,25 +13,32 @@ const EPISODES_PATH = path.join(DATA_DIR, "episodes.json");
 const THEMES_PATH = path.join(DATA_DIR, "themes.json");
 const TAG_TAXONOMY_PATH = path.join(DATA_DIR, "tag-taxonomy.json");
 
-// 每次运行默认只处理 5 期节目，防止一次性调用 AI 过多导致费用过高或被限流。
-// 如需一次性处理所有未打标节目，请运行：node scripts/tag-episodes.js --limit 9999
-const DEFAULT_LIMIT = 5;
+const DEFAULT_LIMIT = Infinity;
+const DEFAULT_CONCURRENCY = 5;
 const MAX_CONTENT_CHARS = 800;
-// 每次 AI 请求之间的间隔（毫秒），避免触发 API 限流
-const REQUEST_DELAY_MS = 1500;
 
-const { limit, ids } = parseArgs(process.argv.slice(2));
+const { limit, ids, concurrency } = parseArgs(process.argv.slice(2));
 
 function parseArgs(args) {
   const parsed = {
     limit: DEFAULT_LIMIT,
+    concurrency: DEFAULT_CONCURRENCY,
     ids: [],
   };
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
+    if (arg === "--all") {
+      parsed.limit = Infinity;
+      continue;
+    }
     if (arg === "--limit" && args[i + 1]) {
       parsed.limit = parseInt(args[i + 1], 10);
+      i += 1;
+      continue;
+    }
+    if (arg === "--concurrency" && args[i + 1]) {
+      parsed.concurrency = Math.max(1, parseInt(args[i + 1], 10) || DEFAULT_CONCURRENCY);
       i += 1;
       continue;
     }
@@ -79,10 +68,8 @@ function readJson(filePath, label) {
 }
 
 function writeEpisodes(episodes) {
-  fs.writeFileSync(EPISODES_PATH, JSON.stringify(episodes, null, 2));
+  atomicWriteJson(EPISODES_PATH, episodes);
 }
-
-// normalizeTags 和 fillTags 已提取到 scripts/utils.js，从那里统一导入。
 
 function truncateContent(content) {
   if (!content) return "";
@@ -103,8 +90,6 @@ function buildPrompt(episode, themes, allowedTags, podcastName) {
   const content = episode.contentSnippet || episode.content || "";
   const truncatedContent = truncateContent(content);
 
-  // 提示词使用中文，与节目内容语言一致，避免语言切换导致的语义偏差
-  // podcastName 从 site.json 动态读取，模板用户换播客后无需修改此脚本
   return `你正在为《${podcastName}》播客的一期节目进行主题归类和标签打标。
 
 【可选主题列表】
@@ -136,14 +121,14 @@ ${Array.from(allowedTags)
 }
 
 async function tagEpisodes() {
-  // 检查 AI 功能是否启用
   if (!isAiEnabled()) {
-    console.log("❌ AI 标签/主题功能未启用（features.aiTagging = false）");
-    console.log("   如需使用此功能，请在 site.json 中设置 features.aiTagging: true");
-    process.exit(1);
+    const cfg = loadSiteConfig();
+    cfg.features = cfg.features || {};
+    cfg.features.aiTagging = true;
+    writeOverrides(cfg);
+    console.log("ℹ️ 检测到终端手动触发，已自动开启 AI 标签功能 (features.aiTagging = true)");
   }
 
-  // 从 site.json 动态读取播客名称，模板用户换播客后无需修改脚本
   const siteConfig = loadSiteConfig();
   const podcastName = siteConfig?.brand?.name || "该播客";
 
@@ -176,7 +161,6 @@ async function tagEpisodes() {
     }
     console.log(`Processing ${episodesToProcess.length} selected episodes...`);
   } else {
-    // Find episodes that don't have tags OR don't have a valid themeId
     const untaggedEpisodes = getUntaggedEpisodes(episodes, validThemeIds);
     console.log(`Found ${untaggedEpisodes.length} untagged episodes.`);
 
@@ -190,10 +174,13 @@ async function tagEpisodes() {
   }
 
   let updatedCount = 0;
+  let finishedCount = 0;
+  const total = episodesToProcess.length;
+  const activeConcurrency = Math.min(concurrency, total);
 
-  for (const episode of episodesToProcess) {
-    console.log(`Tagging [${episode.id}]: ${episode.title}...`);
+  console.log(`🚀 启动智能打标 (并发数: ${activeConcurrency}，待处理: ${total} 期)...\n`);
 
+  async function processOne(episode) {
     const prompt = buildPrompt(episode, themes, allowedTags, podcastName);
 
     try {
@@ -204,11 +191,9 @@ async function tagEpisodes() {
       );
 
       if (result && result.themeId && result.tags) {
-        // Validation: Check if themeId exists
         const matchedTheme = themes.find((t) => t.id === result.themeId);
 
         if (matchedTheme) {
-          // Find the episode in the main array to update it
           const index = episodes.findIndex((e) => e.id === episode.id);
           if (index !== -1) {
             episodes[index].themeId = result.themeId;
@@ -225,29 +210,34 @@ async function tagEpisodes() {
             const finalTags = fillTags(normalizedTags, fallbackTags, 2, 3);
             episodes[index].tags = finalTags;
             updatedCount++;
-            console.log(`  -> Theme: ${matchedTheme.title} (${result.themeId})`);
-            console.log(`  -> Tags: ${finalTags.join(", ")}`);
-
-            // Save after every successful update to be safe
             writeEpisodes(episodes);
+            finishedCount++;
+            console.log(`[${finishedCount}/${total}] ✓ [${episode.id}] ${episode.title.slice(0, 22)}... -> #${matchedTheme.title} (${finalTags.join(", ")})`);
+            return;
           }
         } else {
-          console.warn(
-            `  Warning: AI returned invalid themeId '${result.themeId}'. Skipping assignment.`,
-          );
+          console.warn(`[${episode.id}] ⚠️ AI 返回了无效主题 ID '${result.themeId}'，已跳过。`);
         }
       } else {
-        console.warn("  Invalid response format from AI");
+        console.warn(`[${episode.id}] ⚠️ AI 返回格式不正确`);
       }
     } catch (error) {
-      console.error(`  Failed to tag ${episode.title}:`, error.message);
+      console.error(`[${episode.id}] ❌ 打标失败 [${episode.title.slice(0, 20)}]:`, error.message);
     }
-
-    // Small delay between requests
-    await new Promise((resolve) => setTimeout(resolve, REQUEST_DELAY_MS));
+    finishedCount++;
   }
 
-  console.log(`Finished processing. Updated ${updatedCount} episodes.`);
+  const workers = Array.from({ length: activeConcurrency }, async () => {
+    while (episodesToProcess.length > 0) {
+      const ep = episodesToProcess.shift();
+      if (!ep) break;
+      await processOne(ep);
+    }
+  });
+
+  await Promise.all(workers);
+
+  console.log(`🎉 智能打标完成！本次成功处理并更新了 ${updatedCount} 期单集的主题与标签。`);
 }
 
 tagEpisodes().catch((error) => {

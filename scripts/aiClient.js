@@ -4,7 +4,7 @@ import {
   normalizeProvider,
   SUPPORTED_PROVIDERS,
   providerSupportsJsonResponseFormat,
-} from "./ai-provider-config.js";
+} from "./aiProviderConfig.js";
 
 const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant.";
 
@@ -62,12 +62,6 @@ function getProviderRequestConfig() {
   return { provider, apiUrl, model, headers };
 }
 
-/**
- * Sends a prompt to the AI and expects a JSON response.
- * @param {string} prompt - The user prompt.
- * @param {string} [systemPrompt="You are a helpful assistant."] - The system prompt.
- * @returns {Promise<Object>} - The parsed JSON response.
- */
 export async function askAI(
   prompt,
   systemPrompt = DEFAULT_SYSTEM_PROMPT,
@@ -87,6 +81,7 @@ export async function askAI(
         { role: "user", content: prompt },
       ],
       temperature,
+      stream: false,
     };
 
     async function sendRequest(withResponseFormat) {
@@ -102,10 +97,6 @@ export async function askAI(
       });
     }
 
-    // 根据 provider 能力决定请求策略：
-    // - 已知支持 response_format：直接使用，无需回退
-    // - 已知不支持：直接不传，无需尝试
-    // - 未知 (null)：保留原有先尝试后回退策略
     const rfSupport = providerSupportsJsonResponseFormat(provider);
     let response;
     if (rfSupport === true) {
@@ -120,7 +111,6 @@ export async function askAI(
     }
 
     if (!response.ok) {
-      // 避免把响应体写入日志（有些服务会在错误里返回敏感/冗长信息）
       throw new Error(`API Error: ${response.status}`);
     }
 
@@ -138,10 +128,32 @@ export async function askAI(
       throw new Error("AI response content is empty");
     }
 
+    function extractJson(raw) {
+      const trimmed = raw.trim();
+      const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+      const clean = fenceMatch ? fenceMatch[1].trim() : trimmed;
+      try {
+        return JSON.parse(clean);
+      } catch (err) {
+        const firstBrace = clean.indexOf("{");
+        const lastBrace = clean.lastIndexOf("}");
+        const firstBracket = clean.indexOf("[");
+        const lastBracket = clean.lastIndexOf("]");
+
+        if (firstBrace !== -1 && lastBrace > firstBrace && (firstBracket === -1 || firstBrace < firstBracket)) {
+          return JSON.parse(clean.slice(firstBrace, lastBrace + 1));
+        }
+        if (firstBracket !== -1 && lastBracket > firstBracket) {
+          return JSON.parse(clean.slice(firstBracket, lastBracket + 1));
+        }
+        throw err;
+      }
+    }
+
     try {
-      return JSON.parse(content);
+      return extractJson(content);
     } catch (e) {
-      throw new Error(`Failed to parse JSON response: ${e.message}`);
+      throw new Error(`Failed to parse JSON response: ${e.message}\nRaw Content:\n${content.slice(0, 300)}`);
     }
   } catch (error) {
     console.error("Error in askAI:", error);

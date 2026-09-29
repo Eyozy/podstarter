@@ -1,24 +1,8 @@
-import { askAI, getActiveAiInfo } from "./ai-client.js";
-import { isAiEnabled, loadSiteConfig } from "./site-config.js";
+import { askAI, getActiveAiInfo } from "./aiClient.js";
+import { isAiEnabled, loadSiteConfig, writeOverrides } from "./siteConfig.js";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-
-// 用途：
-// 1. 基于节目标题与摘要，先让 AI 提炼核心标签
-// 2. 再基于这些标签生成 3-5 个主题分类
-// 3. 输出到 src/data/themes.json
-//
-// 对应命令：
-// - npm run analyze
-//   默认均匀抽样模式，只抽样部分节目，成本较低
-// - npm run analyze:full
-//   全量模式，使用全部节目摘要，结果更完整但更慢、更贵
-//
-// 注意：
-// - 这个脚本只负责“生成主题分类体系”
-// - 不会给单集节目写入 themeId / tags
-// - 会覆盖现有的 src/data/themes.json
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,22 +11,8 @@ const EPISODES_FILE = path.join(__dirname, "../src/data/episodes.json");
 const THEMES_FILE = path.join(__dirname, "../src/data/themes.json");
 const TAG_TAXONOMY_FILE = path.join(__dirname, "../src/data/tag-taxonomy.json");
 
-// ── 抽样模式（默认）的参数 ───────────────────────────────────────────────────
-// 从全部节目中按位置均匀选取 N 期，确保早中晚期内容都被覆盖。
-// 例如：共 200 期取 30 个，则分别取第 0、7、14、21...193 期，而非随机或只取最新。
-// 建议值 20-50，过多可能导致 AI 响应变慢或超出上下文限制（取决于所用模型）。
 const SAMPLE_EPISODE_COUNT = 30;
-
-// ── 两种模式共用的摘要截断长度 ────────────────────────────────────────────────
-// 全量模式下，300 期 × 500 字 ≈ 15 万字符，主流模型（128K～1M 上下文）均可承受。
 const SAMPLE_SNIPPET_LENGTH = 500;
-
-// ── 解析命令行参数 ─────────────────────────────────────────────────────────────
-// 支持 --full 参数：使用全量模式（发送所有节目 + 摘要）
-// 默认为均匀抽样模式（发送 SAMPLE_EPISODE_COUNT 期）
-// 用法：
-//   node scripts/analyze-themes.js          ← 均匀抽样（默认）
-//   node scripts/analyze-themes.js --full   ← 全量模式
 const useFullMode = process.argv.includes("--full");
 
 async function readEpisodes() {
@@ -50,10 +20,6 @@ async function readEpisodes() {
   return JSON.parse(episodesData);
 }
 
-/**
- * 均匀抽样：从全部节目中按位置均匀选取 count 期。
- * 取样位置为 0, step, 2*step, ... 其中 step = 总期数 / count，保证覆盖全时间线。
- */
 function sampleEpisodesEvenly(episodes, count) {
   if (episodes.length <= count) return episodes;
   const step = episodes.length / count;
@@ -66,14 +32,14 @@ function sampleEpisodesEvenly(episodes, count) {
 }
 
 async function analyzeThemes() {
-  // 检查 AI 功能是否启用
   if (!isAiEnabled()) {
-    console.log("❌ AI 标签/主题功能未启用（features.aiTagging = false）");
-    console.log("   如需使用此功能，请在 site.json 中设置 features.aiTagging: true");
-    process.exit(1);
+    const cfg = loadSiteConfig();
+    cfg.features = cfg.features || {};
+    cfg.features.aiTagging = true;
+    writeOverrides(cfg);
+    console.log("ℹ️ 检测到终端手动触发，已自动开启 AI 标签功能 (features.aiTagging = true)");
   }
 
-  // 从 site.json 动态读取播客名称和描述，模板用户换播客后无需修改脚本
   const siteConfig = loadSiteConfig();
   const podcastName = siteConfig?.brand?.name || "该播客";
   const podcastDescription = siteConfig?.brand?.meta?.description || "";
@@ -85,7 +51,6 @@ async function analyzeThemes() {
   try {
     const episodes = await readEpisodes();
 
-    // 根据模式决定发送给 AI 的节目列表
     let episodesToAnalyze;
     if (useFullMode) {
       episodesToAnalyze = episodes;
@@ -105,22 +70,22 @@ async function analyzeThemes() {
 
     console.log(`Analyzing ${episodeData.length} episodes...`);
 
-    // Step 1：让 AI 从节目内容中自由归纳核心标签，不预设维度方向，避免偏离播客真实调性
-    const step1Prompt = `你正在分析一档中文播客的节目内容。
+    const step1Prompt = `你是一位专业的内容架构师与播客分类分析专家。
+请深入分析以下中文播客的节目数据（标题与摘要）：
 ${podcastContext}
-
-请仔细阅读以下节目的标题和摘要，从内容本身归纳出 10-15 个核心标签（关键词）。
 
 播客节目数据：
 ${JSON.stringify(episodeData)}
 
-要求：
-1. 完全基于节目内容自然归纳，不要套用固定的分类框架
-2. 标签应贴近这档播客真实的内容调性，从节目实际讨论的话题中提取
-3. 标签应为简洁的中文词汇（2-5 字），具体且有区分度，避免过于宽泛
-4. 优先提炼节目中反复出现的高频话题
+【任务目标】
+从节目内容中提炼 15-20 个具有高区分度、真实覆盖全站内容生态的核心标签（Keywords）。
 
-返回 JSON 格式：
+【分类学准则】
+1. 自底向上归纳：完全忠实于节目实际讨论的具体议题与高频对象，严禁凭空套用虚构的框架。
+2. 具象与辨识度：提取具体的讨论领域、场景、问题类型或核心矛盾（2-5 字中文），杜绝空泛无实质的虚词（如“感受”、“生活”、“故事”、“漫谈”等）。
+3. 维度均衡覆盖：标签需兼顾播客涉及的多个面向（如核心专业探讨、现实生存与实践、心理体验、人际互动、宏观观察等），不可单向堆叠。
+
+返回严格的 JSON 格式：
 {
   "tags": ["标签 1", "标签 2", ...]
 }`;
@@ -142,32 +107,36 @@ ${JSON.stringify(episodeData)}
 
     console.log("Generated tags:", tagsResult.tags.join(", "));
 
-    // Step 2：基于 Step 1 的标签 + 节目数据生成主题，约束 ID 格式避免中文或空格
-    const step2Prompt = `你正在为一档中文播客设计主题分类体系。
+    const step2Prompt = `你是一位专业的信息架构师（Information Architect）。
+请基于以下从播客《${podcastName}》中归纳的核心标签以及节目样本，为这档播客构建一套清晰、立体、边界清晰的主题分类体系（Taxonomy）：
+
+播客信息：
 ${podcastContext}
 
-基于以下从节目内容中提炼的核心标签，以及节目数据，请生成 3-5 个主题分类：
-
-核心标签：
+核心标签池：
 ${JSON.stringify(tagsResult.tags)}
 
-节目数据参考：
+节目样本参考：
 ${JSON.stringify(episodeData)}
 
-要求：
-1. 每个主题起一个有质感的 2-4 字中文标题，符合这档播客的内容气质
-2. 用一句话描述该主题的核心内容
-3. 为每个主题分配 3-5 个最具代表性的标签（必须从上方"核心标签"列表中选取）
-4. 主题之间内容要有明显区分，不要互相重叠
-5. id 字段使用小写英文字母和下划线，例如 daily_life、self_growth，不要使用中文或空格
+【分类架构核心准则】
+1. MECE 原则（相互独立、完全穷尽）：
+   - 3-5 个分类（若话题离散度高可扩至 6 个），分类之间边界清晰、互不重叠。
+   - 杜绝同义反复（如避免将同一生活/专业范畴拆成两个并列分类）。
+   - 整体架构应能自然容纳全站 80% 以上不同侧重的单集。
+2. 风格化命名与具象描述结合：
+   - title（主题标题）：2-4 个字，精准符合本播客的独特性格（技术类严谨精准、文艺生活类自省有质感、商业类干练敏锐）。
+   - description（主题简介）：用一句话清楚点明该分类聚焦的【核心客体、具体场景或核心问题】，语言简洁精炼，严禁全是空洞无物的抒情废话。
+3. 标签映射：每个主题分配 3-5 个最具代表性的标签（必须严格从上方的“核心标签池”中挑选）。
+4. 语义化 ID：id 必须使用有英文业务含义的小写字母与下划线（例如 career_development, system_design, human_relations 等），严禁拼音或随意编号。
 
-返回 JSON 数组格式（不要包裹在其他字段里，直接返回数组）：
+返回严格的 JSON 数组格式（不要包裹在任何外部属性内，直接以 '[' 开始）：
 [
   {
     "id": "theme_id",
-    "title": "中文标题",
-    "description": "一句话描述",
-    "representativeTags": ["标签 1", "标签 2"]
+    "title": "主题标题",
+    "description": "清晰的一句话范围与核心说明",
+    "representativeTags": ["标签1", "标签2", "标签3"]
   }
 ]`;
 
@@ -213,13 +182,18 @@ ${JSON.stringify(episodeData)}
     await fs.writeFile(THEMES_FILE, JSON.stringify(themes, null, 2));
     console.log(`Themes saved to ${THEMES_FILE}`);
 
-    // 保存自动生成的标签库白名单，供后续打标使用，避免标签发散
     const taxonomy = {
       tags: tagsResult.tags,
       aliases: {} // 初始为空，后续可在此处新增手动维护的别名
     };
     await fs.writeFile(TAG_TAXONOMY_FILE, JSON.stringify(taxonomy, null, 2));
     console.log(`Tag taxonomy saved to ${TAG_TAXONOMY_FILE}`);
+
+    const currentConfig = loadSiteConfig();
+    currentConfig.features = currentConfig.features || {};
+    currentConfig.features.themes = true;
+    writeOverrides(currentConfig);
+    console.log("Features updated: themes enabled in site.json");
   } catch (error) {
     console.error("Error analyzing themes:", error);
     process.exit(1);

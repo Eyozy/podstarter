@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { normalizeTags, fillTags } from "./utils.js";
+import { normalizeTags, fillTags, atomicWriteJson } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,9 +22,6 @@ function readJson(filePath, label) {
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }
 
-// normalizeTags 和 fillTags 已提取到 scripts/utils.js，从那里统一导入。
-// normalize-tags.js 需要去除 # 前缀，调用时传入 stripHash: true。
-
 function arraysEqual(a, b) {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
@@ -36,6 +33,11 @@ function arraysEqual(a, b) {
 }
 
 function normalizeAllTags() {
+  if (!fs.existsSync(TAG_TAXONOMY_PATH) || !fs.existsSync(THEMES_PATH) || !fs.existsSync(EPISODES_PATH)) {
+    console.log("ℹ️  缺少必要的数据文件（episodes.json, themes.json 或 tag-taxonomy.json），跳过标签规范化。");
+    return;
+  }
+
   const episodes = readJson(EPISODES_PATH, "Episodes");
   const themes = readJson(THEMES_PATH, "Themes");
   const taxonomy = readJson(TAG_TAXONOMY_PATH, "Tag taxonomy");
@@ -48,10 +50,9 @@ function normalizeAllTags() {
   const themeMap = new Map(themes.map((theme) => [theme.id, theme]));
 
   if (allowedTags.size === 0) {
-    console.error("Tag taxonomy is empty.");
-    process.exit(1);
+    console.log("ℹ️  Tag taxonomy 为空，跳过规范化。");
+    return;
   }
-
   let changedCount = 0;
   let emptyCount = 0;
   let underMinCount = 0;
@@ -88,7 +89,7 @@ function normalizeAllTags() {
     };
   });
 
-  fs.writeFileSync(EPISODES_PATH, JSON.stringify(updatedEpisodes, null, 2));
+  atomicWriteJson(EPISODES_PATH, updatedEpisodes);
 
   console.log("Normalization complete.");
   console.log(`Episodes updated: ${changedCount}`);
