@@ -1,0 +1,2524 @@
+---
+import MainLayout from "../layouts/MainLayout.astro";
+import { loadSiteConfig } from "../../scripts/siteConfig.js";
+const site = loadSiteConfig();
+import { publishedEpisodes, formatEpisodeDate } from "../utils/episodes";
+import fs from "node:fs";
+import path from "node:path";
+import { isValidAdminCookie, isValidTranscriptId, resolveAdminPassword, readEnvMap } from "../utils/auth";
+import { getProviderEnvPrefix } from "../../scripts/aiProviderConfig.js";
+
+export const prerender = false;
+
+const cookieHeader = Astro.request.headers.get("cookie") || "";
+const isAuthenticated = isValidAdminCookie(cookieHeader, resolveAdminPassword());
+const adminPasswordConfigured = Boolean(resolveAdminPassword());
+
+const playCountsPath = path.join(process.cwd(), "src/data/play-counts.json");
+let playCounts: Record<string, number> = {};
+try {
+  if (fs.existsSync(playCountsPath)) {
+    playCounts = JSON.parse(fs.readFileSync(playCountsPath, "utf-8")) || {};
+  }
+} catch {}
+
+const totalPlays = Object.values(playCounts).reduce((a, b) => a + b, 0);
+
+const themesPath = path.join(process.cwd(), "src/data/themes.json");
+let themesList: Array<{ id: string; title: string; description?: string }> = [];
+try {
+  if (fs.existsSync(themesPath)) {
+    themesList = JSON.parse(fs.readFileSync(themesPath, "utf-8")) || [];
+  }
+} catch {}
+
+const envExample = fs.existsSync(path.join(process.cwd(), ".env.example"))
+  ? fs.readFileSync(path.join(process.cwd(), ".env.example"), "utf-8")
+  : "";
+
+const envTemplates = Object.fromEntries(
+  ["deepseek", "openrouter", "xai", "zhipu", "openai-compatible"].map((provider) => {
+    const prefix = getProviderEnvPrefix(provider);
+    const block = envExample
+      .split(/\n\s*\n/u)
+      .find((chunk) => chunk.includes(`${prefix}_API_KEY`));
+    return [provider, block ? `AI_PROVIDER=${provider}\n${block.trim()}\n` : ""];
+  })
+);
+
+const transcriptsDir = path.join(process.cwd(), "src/content/transcripts");
+const placeholderNotice = site.transcripts?.placeholderNotice?.trim() || "";
+
+let realReadyCount = 0;
+let placeholderCount = 0;
+let missingCount = 0;
+
+const episodesData = publishedEpisodes.map((ep) => {
+  const transcriptFile = isValidTranscriptId(ep.id)
+    ? path.join(transcriptsDir, `${ep.id}.md`)
+    : null;
+  let status: "ready" | "placeholder" | "missing" = "missing";
+
+  if (transcriptFile && fs.existsSync(transcriptFile)) {
+    const content = fs.readFileSync(transcriptFile, "utf-8");
+    if (placeholderNotice && content.includes(placeholderNotice)) {
+      status = "placeholder";
+      placeholderCount++;
+    } else {
+      status = "ready";
+      realReadyCount++;
+    }
+  } else {
+    missingCount++;
+  }
+
+  return {
+    ...ep,
+    plays: playCounts[ep.id] || 0,
+    transcriptStatus: status,
+  };
+});
+const envMap = readEnvMap();
+const aiEnvProvider = String(process.env.AI_PROVIDER || envMap.AI_PROVIDER || "").trim();
+const envPrefix = getProviderEnvPrefix(aiEnvProvider) || "";
+const serverAiKey = (envPrefix && (process.env[`${envPrefix}_API_KEY`] || envMap[`${envPrefix}_API_KEY`])) || "";
+const hasServerAiKey = Boolean(serverAiKey);
+const serverAiModel = (envPrefix && (process.env[`${envPrefix}_MODEL`] || envMap[`${envPrefix}_MODEL`])) || "";
+const serverAiUrl = (envPrefix && (process.env[`${envPrefix}_API_URL`] || envMap[`${envPrefix}_API_URL`])) || "";
+let isFsWritable = true;
+try {
+  const testDir = path.join(process.cwd(), "src/data");
+  fs.accessSync(testDir, fs.constants.W_OK);
+} catch {
+  isFsWritable = false;
+}
+
+const currentVersion = "1.1.0";
+const pageTitle = "管理控制台 | " + site.brand.name;
+---
+
+<MainLayout title={pageTitle}>
+  <div class="w-full font-serif" data-admin-root>
+    {!isAuthenticated ? (
+            <div class="max-w-md mx-auto py-16 sm:py-24">
+        <div class="bg-white rounded-2xl border border-[#2d2a26]/10 shadow-sm p-6 sm:p-8 text-center">
+          <div class="size-12 rounded-2xl bg-orange-50 border border-orange-200/80 text-orange-800 flex items-center justify-center mx-auto mb-4">
+            <i class="ri-lock-2-line text-2xl"></i>
+          </div>
+          <h1 class="text-xl font-bold text-[#2d2a26] mb-1 font-serif">管理控制台登录</h1>
+          <p class="text-xs text-[#2d2a26]/60 font-serif leading-relaxed mb-6">
+            请输入管理员密码进入后台。
+          </p>
+          {!adminPasswordConfigured && (
+            <div class="mb-5 text-left p-3 rounded-lg bg-amber-50/90 border border-amber-200/80 text-amber-900 text-xs font-serif leading-relaxed">
+              <div class="flex items-center gap-1.5 font-bold mb-1 text-amber-950 font-mono">
+                <i class="ri-alert-line text-sm text-amber-700"></i>
+                <span>尚未配置管理员密码</span>
+              </div>
+              服务端尚未检测到 <code class="font-mono bg-white px-1 py-0.5 rounded border border-amber-200 text-amber-950 font-bold">ADMIN_PASSWORD</code>。请先在本地 <code class="font-mono bg-white px-1 py-0.5 rounded border border-amber-200 text-amber-950 font-bold">.env</code> 或平台环境变量中配置密码后再试。
+            </div>
+          )}
+
+          <form id="admin-login-form" class="space-y-4" onsubmit="event.preventDefault(); window.__doAdminLogin(); return false;">
+            <div class="text-left">
+              <label class="block font-mono text-xs font-bold mb-1 text-[#2d2a26]">管理员密码 *</label>
+              <input
+                type="password"
+                id="admin-login-password"
+                required
+                placeholder="输入管理员密码"
+                class="w-full px-3.5 py-2.5 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg text-xs font-mono focus:outline-none focus:border-orange-800 focus:bg-white"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();window.__doAdminLogin();}"
+              />
+            </div>
+            <button
+              type="button"
+              id="btn-admin-login"
+              onclick="window.__doAdminLogin()"
+              class="w-full py-2.5 bg-[#2d2a26] hover:bg-orange-800 text-white rounded-lg text-xs font-mono font-bold transition-colors inline-flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            >
+              <i class="ri-login-box-line text-sm"></i>
+              验证并进入控制台
+            </button>
+
+          </form>
+          <div class="mt-6 pt-4 border-t border-[#2d2a26]/10 text-center">
+            <a
+              href="https://github.com/Eyozy/podstarter/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1 text-[11px] text-[#2d2a26]/60 hover:text-orange-800 transition-colors font-serif"
+            >
+              <i class="ri-github-line text-xs"></i>
+              <span>遇到问题？前往 GitHub 提交反馈</span>
+            </a>
+          </div>
+          <script is:inline>
+            window.__doAdminLogin = async function() {
+              const passInput = document.getElementById("admin-login-password");
+              const btn = document.getElementById("btn-admin-login");
+              const password = passInput ? passInput.value.trim() : "";
+              
+              if (!password) {
+                if (window.toast) window.toast.warning("请输入管理员密码");
+                if (passInput) passInput.focus();
+                return;
+              }
+
+              if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="ri-loader-4-line text-sm animate-spin"></i> 验证中...';
+              }
+
+              try {
+                const res = await fetch("/api/admin", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "login", password }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                  window.location.href = "/admin?auth=" + Date.now();
+                } else {
+                  const err = data.error || (res.status === 503 ? "服务端未配置管理员密码" : "密码错误，请核对后重试");
+
+                  if (window.toast) window.toast.error(err);
+                  if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="ri-login-box-line text-sm"></i> 验证并进入控制台';
+                  }
+                }
+              } catch (err) {
+                const msg = "网络异常: " + (err && err.message ? err.message : "请稍后重试");
+
+                if (window.toast) window.toast.error(msg);
+                if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="ri-login-box-line text-sm"></i> 验证并进入控制台';
+                }
+              }
+            };
+          </script>
+        </div>
+      </div>
+    ) : (
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12" data-admin-console>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2d2a26]/10 pb-6 mb-8">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-[#2d2a26] flex items-center gap-2.5">
+            <i class="ri-settings-3-line text-orange-800 text-2xl sm:text-3xl"></i>
+            <span>管理控制台</span>
+          </h1>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+          <button
+            type="button"
+            id="btn-open-password-modal"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2d2a26]/20 bg-white hover:bg-orange-50 text-[#2d2a26] text-xs font-serif font-bold transition-all shadow-xs cursor-pointer"
+            title="修改后台管理员登录密码"
+          >
+            <i class="ri-shield-keyhole-line text-sm text-orange-800"></i>
+            <span>修改密码</span>
+          </button>
+          <button
+            type="button"
+            id="btn-logout"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2d2a26]/20 bg-white hover:bg-orange-50 text-[#2d2a26] text-xs font-serif font-bold transition-all shadow-xs cursor-pointer"
+          >
+            <i class="ri-logout-box-r-line text-sm text-orange-800"></i>
+            退出
+          </button>
+          <a
+            href="https://github.com/Eyozy/podstarter/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2d2a26]/20 bg-white hover:bg-orange-50 text-[#2d2a26] text-xs font-serif font-bold transition-all shadow-xs cursor-pointer"
+            title="前往 GitHub 提交反馈与问题"
+          >
+            <i class="ri-github-line text-sm text-orange-800"></i>
+            <span>反馈建议</span>
+          </a>
+          <a
+            href="/rss.xml"
+            target="_blank"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2d2a26]/20 text-xs font-serif font-semibold text-[#2d2a26] hover:bg-orange-50 transition-colors"
+          >
+            <i class="ri-rss-line text-sm text-orange-800"></i>
+            /rss.xml
+          </a>
+          <a
+            href="/"
+            target="_blank"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2d2a26] text-white text-xs font-serif font-semibold hover:bg-orange-800 transition-colors cursor-pointer"
+          >
+            <i class="ri-external-link-line text-sm"></i>
+            <span>预览播客</span>
+          </a>
+        </div>
+      </div>
+
+      <div id="upstream-version-banner" class="mb-8 p-4 sm:p-5 rounded-2xl border border-orange-200 bg-orange-50/80 text-[#2d2a26] text-xs font-serif flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2.5">
+          <i class="ri-information-line text-lg text-orange-800 shrink-0"></i>
+          <div>
+            <span class="font-bold text-orange-950 font-serif" id="upstream-version-title">检测到 PodStarter 模板有新版本发布！</span>
+            <p class="text-[11px] text-[#2d2a26]/70 mt-0.5 font-serif">你的 GitHub Fork 已配置自动同步工作流，也可在仓库首页点击 “Sync fork” 一键同步更新。</p>
+          </div>
+        </div>
+        <a
+          href="https://github.com/Eyozy/podstarter"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 text-orange-900 font-serif font-bold hover:underline text-xs shrink-0 self-start sm:self-auto"
+        >
+          <span>查看上游更新日志</span>
+        </a>
+      </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-2xl p-5 border border-[#2d2a26]/10 shadow-sm">
+          <div class="flex items-center justify-between text-[#2d2a26]/50 mb-1">
+            <span class="text-xs font-mono uppercase tracking-wider">已发布节目</span>
+            <i class="ri-mic-line text-base text-[#2d2a26]/60"></i>
+          </div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-[#2d2a26]">
+            {publishedEpisodes.length}
+          </div>
+          <p class="text-[11px] text-[#2d2a26]/50 mt-1 font-serif">独立站全网分发期数</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-[#2d2a26]/10 shadow-sm">
+          <div class="flex items-center justify-between text-[#2d2a26]/50 mb-1">
+            <span class="text-xs font-mono uppercase tracking-wider">全站收听数</span>
+            <i class="ri-play-circle-line text-base text-orange-800"></i>
+          </div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-orange-800" id="metric-total-plays">
+            {totalPlays}
+          </div>
+          <p class="text-[11px] text-[#2d2a26]/50 mt-1 font-serif">独立播放器有效请求</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-[#2d2a26]/10 shadow-sm">
+          <div class="flex items-center justify-between text-[#2d2a26]/50 mb-1">
+            <span class="text-xs font-mono uppercase tracking-wider">文字稿已就绪</span>
+            <i class="ri-checkbox-circle-line text-base text-emerald-600"></i>
+          </div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-emerald-700">
+            {realReadyCount}
+            <span class="text-sm font-normal text-[#2d2a26]/40">/ {publishedEpisodes.length}</span>
+          </div>
+          <p class="text-[11px] text-[#2d2a26]/50 mt-1 font-serif">具备实际正文的文字稿</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-[#2d2a26]/10 shadow-sm">
+          <div class="flex items-center justify-between text-[#2d2a26]/50 mb-1">
+            <span class="text-xs font-mono uppercase tracking-wider">待整理文字稿</span>
+            <i class="ri-error-warning-line text-base text-amber-600"></i>
+          </div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-amber-700">
+            {placeholderCount}
+          </div>
+          <p class="text-[11px] text-[#2d2a26]/50 mt-1 font-serif">含占位标记，待转录</p>
+        </div>
+      </div>
+
+      <div class="bg-white text-[#2d2a26] p-6 sm:p-7 rounded-2xl shadow-sm mb-8 border border-[#2d2a26]/10 w-full">
+        <div class="flex items-center gap-2 mb-2">
+          <i class="ri-rss-line text-lg text-orange-800"></i>
+          <h2 class="text-base sm:text-lg font-bold font-serif">一键从各大平台或 RSS 订阅源同步与解析</h2>
+        </div>
+        <p class="text-xs text-[#2d2a26]/70 mb-4 leading-relaxed font-serif w-full">
+          支持直接粘贴小宇宙、Apple Podcasts、喜马拉雅、网易云等全网主流播客主页链接或标准 RSS XML 地址。系统自动智能反查识别并抓取全部历史单集、音频直链与 ShowNotes，直接生成独立站！
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full">
+          <div class="relative flex-1">
+            <input
+              type="url"
+              id="quick-rss-url"
+              placeholder="粘贴小宇宙 / Apple Podcasts / 喜马拉雅 / 网易云链接，或标准 RSS 地址..."
+              class="w-full px-3.5 py-2.5 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg text-[#2d2a26] placeholder-[#2d2a26]/40 text-xs font-mono focus:outline-none focus:border-orange-800 focus:bg-white transition-colors"
+            />
+          </div>
+          <button
+            type="button"
+            id="btn-quick-sync-rss"
+            class="px-5 py-2.5 rounded-lg bg-orange-800 hover:bg-orange-900 text-white font-serif text-xs font-bold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shadow-sm cursor-pointer"
+          >
+            <i class="ri-refresh-line text-sm"></i>
+            一键解析导入
+          </button>
+        </div>
+
+        <div class="flex items-center gap-4 mt-3 text-[11px] text-[#2d2a26]/60 font-mono">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" id="quick-rss-meta-checkbox" checked class="rounded border-[#2d2a26]/20 text-orange-800 focus:ring-0" />
+            <span>同步更新播客名称、封面与简介</span>
+          </label>
+          <span id="quick-rss-feedback" class="text-xs font-mono"></span>
+        </div>
+      </div>
+
+            <div class="flex border-b border-[#2d2a26]/10 mb-6 gap-2 sm:gap-4 overflow-x-auto" id="admin-tabs">
+        <button
+          type="button"
+          data-tab="episodes"
+          onclick="window.__switchAdminTab('episodes')"
+          class="tab-btn px-4 py-2.5 font-mono text-xs font-bold border-b-2 border-orange-800 text-orange-950 flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer"
+        >
+          <i class="ri-list-check-2 text-sm text-orange-800"></i>
+          全部单集 ({publishedEpisodes.length})
+        </button>
+
+        <button
+          type="button"
+          data-tab="subtitles"
+          onclick="window.__switchAdminTab('subtitles')"
+          class="tab-btn px-4 py-2.5 font-mono text-xs font-bold border-b-2 border-transparent text-[#2d2a26]/60 hover:text-[#2d2a26] flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer"
+        >
+          <i class="ri-chat-voice-line text-sm"></i>
+          字幕转文字
+        </button>
+
+        <button
+          type="button"
+          data-tab="about-team"
+          onclick="window.__switchAdminTab('about-team')"
+          class="tab-btn px-4 py-2.5 font-mono text-xs font-bold border-b-2 border-transparent text-[#2d2a26]/60 hover:text-[#2d2a26] flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer"
+        >
+          <i class="ri-team-line text-sm"></i>
+          主播与关于
+        </button>
+
+        <button
+          type="button"
+          data-tab="config"
+          onclick="window.__switchAdminTab('config')"
+          class="tab-btn px-4 py-2.5 font-mono text-xs font-bold border-b-2 border-transparent text-[#2d2a26]/60 hover:text-[#2d2a26] flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer"
+        >
+          <i class="ri-settings-line text-sm"></i>
+          平台与设置
+        </button>
+
+        <button
+          type="button"
+          data-tab="ai-settings"
+          onclick="window.__switchAdminTab('ai-settings')"
+          class="tab-btn px-4 py-2.5 font-mono text-xs font-bold border-b-2 border-transparent text-[#2d2a26]/60 hover:text-[#2d2a26] flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer"
+        >
+          <i class="ri-brain-line text-sm"></i>
+          AI 设置
+        </button>
+      </div>
+      <script is:inline>
+        window.__switchAdminTab = function(targetTab) {
+          const tabs = ["episodes", "subtitles", "about-team", "config", "ai-settings"];
+          if (!tabs.includes(targetTab)) return;
+          try {
+            history.replaceState(null, "", "#" + targetTab);
+          } catch (e) {}
+          tabs.forEach(function(tabName) {
+            const btn = document.querySelector('#admin-tabs [data-tab="' + tabName + '"]');
+            const panel = document.getElementById("panel-" + tabName);
+            if (tabName === targetTab) {
+              if (btn) {
+                btn.className = "tab-btn px-4 py-2.5 font-mono text-xs font-bold border-b-2 border-orange-800 text-orange-950 flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer";
+              }
+              if (panel) {
+                panel.classList.remove("hidden");
+                panel.classList.remove("tab-pane-animate");
+                void panel.offsetWidth;
+                panel.classList.add("tab-pane-animate");
+              }
+            } else {
+              if (btn) {
+                btn.className = "tab-btn px-4 py-2.5 font-mono text-xs font-bold border-b-2 border-transparent text-[#2d2a26]/60 hover:text-[#2d2a26] flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer";
+              }
+              if (panel) {
+                panel.classList.add("hidden");
+                panel.classList.remove("tab-pane-animate");
+              }
+            }
+          });
+        };
+
+        function applyInitialTab() {
+          try {
+            const initialHash = window.location.hash.replace(/^#/, "");
+            if (["episodes", "subtitles", "about-team", "config", "ai-settings"].includes(initialHash)) {
+              window.__switchAdminTab(initialHash);
+            }
+          } catch (e) {}
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", applyInitialTab);
+        } else {
+          applyInitialTab();
+        }
+        window.addEventListener("hashchange", applyInitialTab);
+      </script>
+
+      <div id="panel-episodes" class="tab-panel">
+        <div class="bg-white rounded-2xl border border-[#2d2a26]/10 shadow-sm overflow-hidden w-full">
+                    <div class="p-4 sm:p-5 border-b border-[#2d2a26]/10 bg-[#fdfcfa] flex flex-col sm:flex-row gap-3 justify-between items-center">
+            <div class="relative w-full sm:w-80">
+            <i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-[#2d2a26]/40 text-sm"></i>
+              <input
+                type="text"
+                id="episode-search"
+                placeholder="搜索标题或单集 ID..."
+                class="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-[#2d2a26]/15 rounded-lg focus:outline-none focus:border-orange-800 font-sans"
+              />
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                id="filter-status"
+                class="text-xs bg-white border border-[#2d2a26]/15 rounded-lg px-2.5 py-1.5 text-[#2d2a26] focus:outline-none focus:border-orange-800 font-mono"
+              >
+                <option value="all">全部文字稿状态</option>
+                <option value="ready">仅文字稿已就绪</option>
+                <option value="placeholder">仅待整理占位</option>
+                <option value="missing">仅暂缺文字稿</option>
+              </select>
+            </div>
+          </div>
+
+                    <div class="overflow-x-auto max-h-130">
+            <table class="w-full text-left border-collapse text-xs" id="episodes-table">
+              <thead class="sticky top-0 bg-[#f9f8f6] border-b border-[#2d2a26]/10 text-[#2d2a26]/70 font-mono">
+                <tr>
+                  <th class="py-3 px-4">标题 / 单集 ID</th>
+                  <th class="py-3 px-4">发布时间</th>
+                  <th class="py-3 px-4">时长</th>
+                  <th class="py-3 px-4">文字稿真实状态</th>
+                  <th class="py-3 px-4 text-right">独立站收听</th>
+                  <th class="py-3 px-4 text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[#2d2a26]/5 font-sans" id="episodes-tbody">
+                {episodesData.length === 0 ? (
+                  <tr>
+                    <td colspan="6" class="py-12 text-center text-[#2d2a26]/40 font-mono">
+                      暂未同步播客节目。请在上方输入你的 RSS 订阅源地址并点击“一键解析导入”。
+                    </td>
+                  </tr>
+                ) : (
+                  episodesData.map((ep) => (
+                    <tr class="episode-row hover:bg-orange-50/20 transition-colors" data-id={ep.id} data-title={ep.title.toLowerCase()} data-status={ep.transcriptStatus}>
+                      <td class="py-3 px-4 font-bold text-[#2d2a26] max-w-70">
+                        <div class="truncate" title={ep.title}>
+                          <a href={`/episodes/${ep.id}`} target="_blank" class="hover:text-orange-800 transition-colors">
+                            {ep.title}
+                          </a>
+                        </div>
+                        <div class="text-[10px] font-mono text-[#2d2a26]/40 font-normal truncate mt-0.5">
+                          ID: {ep.id}
+                        </div>
+                      </td>
+                      <td class="py-3 px-4 text-[#2d2a26]/60 font-mono text-[11px] whitespace-nowrap">
+                        {formatEpisodeDate(ep.pubDate)}
+                      </td>
+                      <td class="py-3 px-4 text-[#2d2a26]/60 font-mono text-[11px] whitespace-nowrap">
+                        {ep.itunes?.duration || "--:--"}
+                      </td>
+                      <td class="py-3 px-4 whitespace-nowrap">
+                        {ep.transcriptStatus === "ready" && (
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <i class="ri-check-line text-xs"></i>
+                            已就绪
+                          </span>
+                        )}
+                        {ep.transcriptStatus === "placeholder" && (
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+                            <i class="ri-time-line text-xs"></i>
+                            待整理
+                          </span>
+                        )}
+                        {ep.transcriptStatus === "missing" && (
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-[#2d2a26]/40 bg-zinc-100">
+                            暂缺
+                          </span>
+                        )}
+                      </td>
+                      <td class="py-3 px-4 text-right font-mono font-bold text-orange-950 whitespace-nowrap">
+                        <span class="play-count-badge">{ep.plays}</span>
+                      </td>
+                      <td class="py-3 px-4 text-center whitespace-nowrap">
+                        <div class="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            class="simulate-play-btn text-[11px] text-orange-800 hover:text-orange-900 border border-orange-200 hover:bg-orange-50 px-2 py-0.5 rounded font-mono transition-colors"
+                            data-id={ep.id}
+                            title="测试上报播放数据"
+                          >
+                            +1 试听
+                          </button>
+                          <button
+                            type="button"
+                            class="delete-episode-btn text-[11px] text-red-700 hover:text-red-900 border border-red-200 hover:bg-red-50 px-2 py-0.5 rounded font-mono transition-colors"
+                            data-id={ep.id}
+                            data-title={ep.title}
+                            title="从本地数据库中删除此单集"
+                          >
+                            删除
+                          </button>
+                          <a
+                            href={`/episodes/${ep.id}`}
+                            target="_blank"
+                            class="text-[11px] text-[#2d2a26]/60 hover:text-orange-800 font-mono transition-colors"
+                          >
+                            <span>直达收听</span>
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+            <div id="panel-subtitles" class="tab-panel hidden">
+        <div class="bg-white rounded-2xl border border-[#2d2a26]/10 shadow-sm p-6 sm:p-8 w-full">
+          <h2 class="text-lg font-bold text-[#2d2a26] mb-1 flex items-center gap-2">
+            <i class="ri-chat-voice-line text-lg text-orange-800"></i>
+            字幕转文字稿
+          </h2>
+          <p class="text-xs text-[#2d2a26]/60 mb-6 font-sans leading-relaxed">
+            支持直接粘贴剪映、飞书妙记、通义听悟等云端工具导出的标准字幕（.srt / .vtt）或同行时间戳文本，秒级转为带时间戳的 Markdown 文字稿。
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full items-stretch">
+            <div class="flex flex-col h-full">
+              <div class="flex justify-between items-center h-8 mb-2">
+                <label class="text-xs font-bold font-sans">输入原始字幕 / 逐句记录：</label>
+                <div class="flex items-center gap-2">
+                  <button type="button" id="load-sample-srt" class="text-[11px] font-mono text-orange-800 hover:underline cursor-pointer">
+                    载入标准 SRT
+                  </button>
+                  <span class="text-[#2d2a26]/20">|</span>
+                  <button type="button" id="load-sample-mixed" class="text-[11px] font-mono text-orange-800 hover:underline cursor-pointer">
+                    载入同行混排示例
+                  </button>
+                </div>
+              </div>
+              <textarea
+                id="raw-subtitles-input"
+                placeholder="支持以下任意格式直接粘贴：
+格式 1 (同行混排):
+00:02:05 [主播 A] 很高兴污染你的房间。
+02:15 嘉宾：今天我们聊聊怎么制造变化。
+
+格式 2 (标准 SRT/VTT):
+1
+00:02:05,000 --> 00:02:10,000
+[主播 A]: 大家好，欢迎收听本期播客。
+
+格式 3 (时间节点):
+22:44 去做那个多少能让自己兴奋的决定"
+                rows="18"
+                style="height: 420px; min-height: 420px;"
+                class="w-full p-3 font-mono text-xs border border-[#2d2a26]/15 rounded-xl focus:outline-none focus:border-orange-800 resize-none block leading-relaxed overflow-y-auto"
+              ></textarea>
+              <div class="mt-3 flex items-center h-9">
+                <button
+                  type="button"
+                  id="btn-convert-subtitles"
+                  class="px-4 py-2 bg-orange-800 text-white rounded-lg font-mono text-xs font-bold hover:bg-orange-900 transition-colors inline-flex items-center gap-2 cursor-pointer h-full"
+                >
+                  <i class="ri-sparkling-line text-sm"></i>
+                  开始智能解析转化
+                </button>
+              </div>
+            </div>
+
+            <div class="flex flex-col h-full">
+              <div class="flex justify-between items-center h-8 mb-2">
+                <label class="text-xs font-bold font-sans">转化后的交互式文字稿：</label>
+                <button type="button" id="btn-copy-markdown" class="text-[11px] font-mono text-orange-800 hover:underline cursor-pointer">
+                  复制 Markdown
+                </button>
+              </div>
+              <textarea
+                id="converted-markdown-output"
+                readonly
+                rows="18"
+                style="height: 420px; min-height: 420px;"
+                class="w-full p-3 font-mono text-xs bg-[#fbf9f6] border border-[#2d2a26]/15 rounded-xl text-[#2d2a26] resize-none block leading-relaxed overflow-y-auto"
+              ></textarea>
+              <div class="mt-3 flex items-center gap-2 h-9">
+                <select id="bind-episode-select" class="text-xs border border-[#2d2a26]/15 rounded-lg px-2.5 font-mono min-w-0 flex-1 truncate bg-white h-full">
+                  <option value="">-- 选择绑定的单集 --</option>
+                  {publishedEpisodes.map((ep) => (
+                    <option value={ep.id}>{ep.title}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  id="btn-save-transcript-file"
+                  class="px-4 bg-[#2d2a26] text-white rounded-lg font-mono text-xs font-bold hover:bg-orange-800 transition-colors whitespace-nowrap shrink-0 cursor-pointer h-full flex items-center justify-center"
+                >
+                  保存为该集文字稿
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+            <div id="panel-about-team" class="tab-panel hidden">
+        <div class="bg-white rounded-2xl border border-[#2d2a26]/10 shadow-sm p-6 sm:p-8 w-full">
+          <h2 class="text-lg font-bold text-[#2d2a26] mb-1 flex items-center gap-2">
+            <i class="ri-team-line text-lg text-orange-800"></i>
+            主播与关于设置
+          </h2>
+          <p class="text-xs text-[#2d2a26]/60 mb-6 font-sans leading-relaxed">
+            设置播客详细介绍、主播团队成员（支持添加多个社交主页）、商务合作与听众反馈，以及首页横幅、页脚描述等文案外观。
+          </p>
+
+          <form id="about-form" class="space-y-6 text-xs font-sans">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <div>
+                <label class="block font-bold mb-1">页面大标题 *</label>
+                <input type="text" name="aboutTitle" value={site.about?.title || "关于我们"} class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+              </div>
+
+              <div>
+                <label class="block font-bold mb-1">标语/口号</label>
+                <input type="text" name="aboutTagline" value={site.about?.tagline || ""} class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold mb-1">播客介绍文案</label>
+              <div class="rounded-xl border border-[#2d2a26]/15 bg-white overflow-hidden focus-within:border-orange-800 focus-within:ring-1 focus-within:ring-orange-800 transition-all">
+                <textarea name="aboutIntro" rows="3" class="w-full px-3.5 py-2.5 bg-transparent border-0 focus:outline-none font-sans text-xs resize-y block leading-relaxed">{site.about?.intro || ""}</textarea>
+              </div>
+            </div>
+                        <div class="pt-4 border-t border-[#2d2a26]/10">
+              <div class="flex justify-between items-center mb-4">
+                <div>
+                  <h3 class="text-sm font-bold text-[#2d2a26]">主播与团队成员设置</h3>
+                  <p class="text-[11px] text-[#2d2a26]/50">支持设置主播姓名、头衔（选填，留空则不显示）与多个社交主页链接（小红书、微博、公众号、即刻等）</p>
+                </div>
+                <button
+                  type="button"
+                  id="btn-add-member"
+                  class="px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-200 text-orange-900 font-mono text-xs font-bold hover:bg-orange-100 transition-colors inline-flex items-center gap-1.5"
+                >
+                  <i class="ri-add-line text-sm"></i>
+                  添加成员
+                </button>
+              </div>
+
+              <div id="members-container" class="space-y-4">
+                              </div>
+            </div>
+
+                        <div class="pt-4 border-t border-[#2d2a26]/10 space-y-4">
+              <h3 class="text-sm font-bold text-[#2d2a26]">联系合作与听众反馈文案自定义</h3>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-[#faf9f7] p-4 rounded-xl border border-[#2d2a26]/5">
+                <div>
+                  <label class="block font-bold mb-1">联系模块标题 (如：商务合作 / 听众来信)</label>
+                  <input type="text" name="contactTitle" value={site.about?.contact?.title || "联系我们"} class="w-full px-3 py-2 bg-white border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">联系邮箱地址</label>
+                  <input type="email" name="contactEmail" value={site.about?.contact?.email || ""} class="w-full px-3 py-2 bg-white border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div class="md:col-span-2">
+                  <label class="block font-bold mb-1">联系说明提示文案</label>
+                  <input type="text" name="contactDesc" value={site.about?.contact?.description || "如有合作或来信，欢迎发送邮件至："} class="w-full px-3 py-2 bg-white border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-[#faf9f7] p-4 rounded-xl border border-[#2d2a26]/5">
+                <div>
+                  <label class="block font-bold mb-1">反馈模块标题 (如：想听的选题征集 / 听众反馈)</label>
+                  <input type="text" name="feedbackTitle" value={site.about?.feedback?.title || "网站反馈"} class="w-full px-3 py-2 bg-white border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">问卷表单链接 (飞书/腾讯文档/Google表单)</label>
+                  <input type="url" name="feedbackUrl" value={site.about?.feedback?.formUrl || ""} class="w-full px-3 py-2 bg-white border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">反馈说明提示文案</label>
+                  <input type="text" name="feedbackDesc" value={site.about?.feedback?.description || "如果你对节目有任何建议或想听的选题："} class="w-full px-3 py-2 bg-white border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">问卷按钮文字</label>
+                  <input type="text" name="feedbackButtonText" value={site.about?.feedback?.formButtonText || "填写反馈表单"} class="w-full px-3 py-2 bg-white border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+                </div>
+              </div>
+            </div>
+
+
+            <div class="pt-6 border-t border-[#2d2a26]/10 space-y-4">
+              <div>
+                <h3 class="text-sm font-bold text-[#2d2a26] font-serif">首页横幅与文案外观</h3>
+                <p class="text-[11px] text-[#2d2a26]/50 font-serif">自定义首页 Hero 核心标语、副标题与按钮文案</p>
+              </div>
+
+              <div class="grid gap-4 sm:gap-5 md:grid-cols-2">
+                <div class="md:col-span-2">
+                  <label class="block font-bold mb-1 font-serif text-xs">首页主标题（前半句）</label>
+                  <input type="text" name="heroTitlePrefix" value={site.hero?.titlePrefix || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">首页主标题（高亮词）</label>
+                  <input type="text" name="heroTitleHighlight" value={site.hero?.titleHighlight || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">首页主标题（标点/后缀）</label>
+                  <input type="text" name="heroTitleSuffix" value={site.hero?.titleSuffix || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block font-bold mb-1 font-serif text-xs">首页副标题</label>
+                  <div class="rounded-xl border border-[#2d2a26]/15 bg-[#faf9f7] overflow-hidden focus-within:border-orange-800 focus-within:bg-white focus-within:ring-1 focus-within:ring-orange-800 transition-all">
+                    <textarea name="heroDescription" rows="2" class="w-full px-3.5 py-2.5 bg-transparent border-0 focus:outline-none font-mono text-xs resize-y block leading-relaxed">{site.hero?.description || ""}</textarea>
+                  </div>
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">按钮文案：收听最新一期</label>
+                  <input type="text" name="ctaListenLabel" value={site.hero?.cta?.listenLatestLabel || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">按钮文案：浏览全部剧集</label>
+                  <input type="text" name="ctaBrowseLabel" value={site.hero?.cta?.browseAllDesktopLabel || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-6 border-t border-[#2d2a26]/10 space-y-4">
+              <div>
+                <h3 class="text-sm font-bold text-[#2d2a26] font-serif">页脚文案与核心图片资产</h3>
+                <p class="text-[11px] text-[#2d2a26]/50 font-serif">配置全站统一页脚描述行与品牌图片直链</p>
+              </div>
+
+              <div class="grid gap-4 sm:gap-5 md:grid-cols-2">
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">页脚描述第一行</label>
+                  <input type="text" name="footerLine1" value={site.footer?.descriptionLine1 || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">页脚描述第二行</label>
+                  <input type="text" name="footerLine2" value={site.footer?.descriptionLine2 || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">默认封面图 URL</label>
+                  <input type="text" name="defaultCover" value={site.assets?.defaultCover || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">社交分享图 (OG) URL</label>
+                  <input type="text" name="ogImage" value={site.assets?.ogImage || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block font-bold mb-1 font-serif text-xs">站点图标 (favicon) URL</label>
+                  <input type="text" name="favicon" value={site.assets?.favicon || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-6 border-t border-[#2d2a26]/10 space-y-4">
+              <div>
+                <h3 class="text-sm font-bold text-[#2d2a26] font-serif">分享卡片与文字稿占位</h3>
+                <p class="text-[11px] text-[#2d2a26]/50 font-serif">配置单集分享卡片生成文字与未录入文字稿时的默认提示</p>
+              </div>
+
+              <div class="grid gap-4 sm:gap-5 md:grid-cols-2">
+                <div class="md:col-span-2">
+                  <label class="block font-bold mb-1 font-serif text-xs">文字稿占位提示（节目暂无文字稿时显示）</label>
+                  <div class="rounded-xl border border-[#2d2a26]/15 bg-[#faf9f7] overflow-hidden focus-within:border-orange-800 focus-within:bg-white focus-within:ring-1 focus-within:ring-orange-800 transition-all">
+                    <textarea name="transcriptsPlaceholder" rows="2" class="w-full px-3.5 py-2.5 bg-transparent border-0 focus:outline-none font-mono text-xs resize-y block leading-relaxed">{site.transcripts?.placeholderNotice || ""}</textarea>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">分享卡标题</label>
+                  <input type="text" name="shareCardTitle" value={site.shareCard?.title || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">下载按钮文案</label>
+                  <input type="text" name="shareCardDownloadLabel" value={site.shareCard?.downloadLabel || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">扫码提示文案</label>
+                  <input type="text" name="shareCardQrLabel" value={site.shareCard?.qrLabel || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">生成中文案</label>
+                  <input type="text" name="shareCardGeneratingLabel" value={site.shareCard?.generatingLabel || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">生成失败提示</label>
+                  <input type="text" name="shareCardErrorLabel" value={site.shareCard?.generateErrorMessage || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">下载文件名前缀</label>
+                  <input type="text" name="shareCardFilenamePrefix" value={site.shareCard?.filenamePrefix || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-6 border-t border-[#2d2a26]/10 space-y-4">
+              <div>
+                <h3 class="text-sm font-bold text-[#2d2a26] font-serif">节目列表搜索空状态文案</h3>
+                <p class="text-[11px] text-[#2d2a26]/50 font-serif">当听众搜索未匹配到节目时显示的提示标题与副标题</p>
+              </div>
+
+              <div class="grid gap-4 sm:gap-5 md:grid-cols-2">
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">无结果时标题</label>
+                  <input type="text" name="episodesEmptyTitle" value={site.pages?.episodes?.emptyTitle || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+                <div>
+                  <label class="block font-bold mb-1 font-serif text-xs">无结果时副标题</label>
+                  <input type="text" name="episodesEmptySubtitle" value={site.pages?.episodes?.emptySubtitle || ""} class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white" />
+                </div>
+              </div>
+            </div>
+            <div class="pt-4 flex items-center gap-3">
+              <button
+                type="submit"
+                class="px-5 py-2.5 rounded-lg bg-[#2d2a26] text-white font-mono text-xs font-bold hover:bg-orange-800 transition-colors inline-flex items-center gap-2 shadow-sm"
+              >
+                <i class="ri-check-line text-sm"></i>
+                保存关于页与外观文案设置
+              </button>
+              <span id="about-form-feedback" class="text-xs font-mono"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+            <div id="panel-config" class="tab-panel hidden">
+        <div class="bg-white rounded-2xl border border-[#2d2a26]/10 shadow-sm p-6 sm:p-8 w-full">
+          <h2 class="text-lg font-bold text-[#2d2a26] mb-1 flex items-center gap-2">
+            <i class="ri-settings-line text-lg text-orange-800"></i>
+            播客信息与收听渠道
+          </h2>
+          <p class="text-xs text-[#2d2a26]/60 mb-6 font-sans leading-relaxed">
+            在此设置播客名称、封面与各商业平台订阅直链。未填写的渠道与二维码将在前台首页自动完全隐藏，绝不留白。
+          </p>
+
+          <form id="config-form" class="space-y-6 text-xs font-sans">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+              <div>
+                <label class="block font-bold mb-1">播客品牌名称 *</label>
+                <input type="text" name="brandName" value={site.brand.name} required class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-sans focus:outline-none focus:border-orange-800" />
+              </div>
+
+              <div>
+                <label class="block font-bold mb-1">创办年份 (如 2024)</label>
+                <input type="number" name="establishedYear" value={site.brand.establishedYear || new Date().getFullYear()} min="1990" max="2099" class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+              </div>
+
+              <div>
+                <label class="block font-bold mb-1">默认 RSS 源地址</label>
+                <input type="url" name="rssUrl" value={site.podcast.rssUrl} class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold mb-1">播客一句话简介</label>
+              <div class="rounded-xl border border-[#2d2a26]/15 bg-white overflow-hidden focus-within:border-orange-800 focus-within:ring-1 focus-within:ring-orange-800 transition-all">
+                <textarea
+                  id="podcast-description-input"
+                  name="description"
+                  rows="2"
+                  class="w-full min-h-[72px] px-3.5 py-2.5 bg-transparent border-0 focus:outline-none font-sans text-xs resize-none block leading-relaxed overflow-hidden"
+                  oninput="this.style.height='auto';this.style.height=Math.max(72, this.scrollHeight)+'px';"
+                >{site.brand.meta.description}</textarea>
+              </div>
+            </div>
+
+            <div class="mt-6 mb-6 bg-[#faf9f7] p-5 sm:p-6 rounded-2xl border border-[#2d2a26]/10 space-y-4">
+              <h3 class="text-sm font-bold text-[#2d2a26]">可选功能开关</h3>
+
+                            <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <input type="checkbox" id="feature-transcripts-checkbox" name="featureTranscripts" checked={site.features?.transcripts === true} class="rounded border-gray-300 text-orange-800 focus:ring-0 size-4" />
+                    <label for="feature-transcripts-checkbox" class="font-bold text-xs text-[#2d2a26] cursor-pointer">开启文字稿功能</label>
+                  </div>
+                  <p class="text-[11px] text-[#2d2a26]/60">开启后在单集详情页展示文字稿与点击句子快进播放；关闭时仅显示音频播放与单集简介。</p>
+                </div>
+              </div>
+
+              <div class="flex items-start justify-between gap-3 pt-3 border-t border-[#2d2a26]/5">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <input type="checkbox" id="feature-ai-tagging-checkbox" name="featureAiTagging" checked={site.features?.aiTagging === true} class="rounded border-gray-300 text-orange-800 focus:ring-0 size-4" />
+                    <label for="feature-ai-tagging-checkbox" class="font-bold text-xs text-[#2d2a26] cursor-pointer">开启 AI 单集标签与标签筛选栏</label>
+                  </div>
+                  <p class="text-[11px] text-[#2d2a26]/60">开启后在「全部节目」页左侧展示标签筛选栏，并在单集卡片显示智能提炼的标签；关闭时完全隐藏标签筛选与标签展示。</p>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-[#2d2a26]/5 space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <input type="checkbox" id="feature-themes-checkbox" name="featureThemes" checked={site.features?.themes === true} class="rounded border-gray-300 text-orange-800 focus:ring-0 size-4" />
+                      <label for="feature-themes-checkbox" class="font-bold text-xs text-[#2d2a26] cursor-pointer">开启主题分类导航页 (/themes)</label>
+                    </div>
+                    <p class="text-[11px] text-[#2d2a26]/60">开启后在全站导航栏展示主题分类页面。单集少于 10 期建议保持关闭。</p>
+                  </div>
+                </div>
+
+                <div class="p-3.5 sm:p-4 rounded-xl border border-orange-200/80 bg-orange-50/50 space-y-3">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <i class="ri-sparkling-line text-sm text-orange-800"></i>
+                      <span class="font-bold text-xs text-[#2d2a26]">AI 主题分类与智能打标工作流</span>
+                    </div>
+                    {themesList.length > 0 ? (
+                      <span class="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full inline-flex items-center gap-1 self-start sm:self-auto">
+                        <span class="size-1.5 rounded-full bg-emerald-600"></span>
+                        当前已就绪 {themesList.length} 个主题
+                      </span>
+                    ) : (
+                      <span class="text-[11px] font-mono text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1 self-start sm:self-auto">
+                        尚未生成主题
+                      </span>
+                    )}
+                  </div>
+
+                  {themesList.length > 0 && (
+                    <div class="space-y-1.5">
+                      <div class="flex flex-wrap gap-1.5 pt-0.5">
+                        {themesList.map((t) => (
+                          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-orange-200/80 text-[#2d2a26] text-[11px] font-serif shadow-2xs" title={`ID: ${t.id}\n描述: ${t.description || "无"}`}>
+                            <span class="text-orange-800 font-bold">#</span>
+                            <span class="font-bold">{t.title}</span>
+                          </span>
+                        ))}
+                      </div>
+                      <p class="text-[10px] text-[#2d2a26]/50 font-serif">
+                        💡 数据保存在 <code class="font-mono bg-white px-1 py-0.5 rounded border border-orange-200/60">src/data/themes.json</code>。AI 默认归纳 3~5 个主题，你也可随时直接在 JSON 中增删、改名或修改描述。
+                      </p>
+                    </div>
+                  )}
+
+                  <p class="text-[11px] text-[#2d2a26]/70 font-serif leading-relaxed">
+                    AI 主题聚类与批量单集打标推荐在终端执行，具备完整的实时进度与容错保护：
+                  </p>
+
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <div class="bg-[#2d2a26] text-white/90 p-2.5 rounded-xl font-mono text-[11px] flex items-center justify-between gap-2 shadow-2xs">
+                      <div class="overflow-hidden truncate">
+                        <span class="text-orange-400 select-none">$ </span>
+                        <code class="text-stone-200 select-all">npm run analyze</code>
+                        <span class="text-stone-400 text-[10px] ml-1.5 select-none">(生成主题大类)</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn-copy-command shrink-0 px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white text-[10px] font-mono font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        data-copy="npm run analyze"
+                      >
+                        <i class="ri-file-copy-line text-xs"></i>
+                        <span>复制</span>
+                      </button>
+                    </div>
+
+                    <div class="bg-[#2d2a26] text-white/90 p-2.5 rounded-xl font-mono text-[11px] flex items-center justify-between gap-2 shadow-2xs">
+                      <div class="overflow-hidden truncate">
+                        <span class="text-orange-400 select-none">$ </span>
+                        <code class="text-stone-200 select-all">npm run tag</code>
+                        <span class="text-stone-400 text-[10px] ml-1.5 select-none">(单集自动打标)</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn-copy-command shrink-0 px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white text-[10px] font-mono font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        data-copy="npm run tag"
+                      >
+                        <i class="ri-file-copy-line text-xs"></i>
+                        <span>复制</span>
+                      </button>
+                    </div>
+
+                    <div class="sm:col-span-2 bg-[#2d2a26] text-white/90 p-2.5 rounded-xl font-mono text-[11px] flex items-center justify-between gap-2 shadow-2xs">
+                      <div class="overflow-hidden truncate">
+                        <span class="text-emerald-400 select-none"># 一步到位全套执行：</span>
+                        <code class="text-amber-200 select-all font-bold">npm run analyze && npm run tag</code>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn-copy-command shrink-0 px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white text-[10px] font-mono font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        data-copy="npm run analyze && npm run tag"
+                      >
+                        <i class="ri-file-copy-line text-xs"></i>
+                        <span>复制全套命令</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 pt-6 border-t border-[#2d2a26]/10 space-y-4">
+              <h3 class="text-sm font-bold text-[#2d2a26]">各大平台收听渠道与二维码管理</h3>
+              <p class="text-[11px] text-[#2d2a26]/60">填写后将显示在播客首页底部的「保持连接」卡片中。留空的项前台自动隐藏，绝不留白。</p>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                  <label class="block font-bold mb-1">Apple Podcasts 订阅链接</label>
+                  <input type="url" name="appleUrl" value={site.podcast.appleUrl || ""} placeholder="https://podcasts.apple.com/..." class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">小宇宙播客主页链接</label>
+                  <input type="url" name="xiaoyuzhouUrl" value={site.podcast.xiaoyuzhouUrl || ""} placeholder="https://www.xiaoyuzhoufm.com/podcast/..." class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">喜马拉雅节目主页</label>
+                  <input type="url" name="ximalayaUrl" value={(site.podcast as any).ximalayaUrl || ""} placeholder="https://www.ximalaya.com/album/..." class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">Spotify 播客链接</label>
+                  <input type="url" name="spotifyUrl" value={(site.podcast as Record<string, string | undefined>).spotifyUrl || ""} placeholder="https://open.spotify.com/show/..." class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">网易云音乐播客主页</label>
+                  <input type="url" name="neteaseUrl" value={(site.podcast as Record<string, string | undefined>).neteaseUrl || ""} placeholder="https://music.163.com/#/djradio?id=..." class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">微信公众号二维码图片 URL (留空不显示)</label>
+                  <input type="url" name="wechatQr" value={site.podcast.wechatQr || ""} placeholder="https://.../wechat-qr.png" class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+
+                <div>
+                  <label class="block font-bold mb-1">小宇宙订阅二维码图片 URL (留空不显示)</label>
+                  <input type="url" name="xiaoyuzhouQr" value={site.podcast.xiaoyuzhouQr || ""} placeholder="https://.../xyz-qr.png" class="w-full px-3 py-2 border border-[#2d2a26]/15 rounded-lg font-mono focus:outline-none focus:border-orange-800" />
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-4 flex items-center gap-3">
+              <button
+                type="submit"
+                class="px-5 py-2.5 rounded-lg bg-[#2d2a26] text-white font-mono text-xs font-bold hover:bg-orange-800 transition-colors inline-flex items-center gap-2 shadow-sm"
+              >
+                <i class="ri-check-line text-sm"></i>
+                保存站点与分发配置
+              </button>
+              <span id="config-form-feedback" class="text-xs font-mono"></span>
+            </div>
+          </form>
+
+          <div class="mt-8 pt-6 border-t border-red-200/60 space-y-3">
+            <div class="flex items-center gap-2 text-red-700">
+              <i class="ri-error-warning-line text-base"></i>
+              <h3 class="text-xs font-bold font-serif uppercase tracking-wider">危险区域 · 重置清空数据 (对应 npm run reset)</h3>
+            </div>
+            <p class="text-[11px] text-[#2d2a26]/60 font-serif leading-relaxed">
+              此操作将清空本地全部节目（<code>episodes.json</code>）、主题分类（<code>themes.json</code>）与生成的文字稿并清除 RSS 地址缓存。适合更换新播客或切换演示内容时使用。
+            </p>
+            <div class="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                id="btn-reset-all-data"
+                class="px-3.5 py-1.5 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-800 text-xs font-serif font-bold transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <i class="ri-delete-bin-line text-sm"></i>
+                一键重置清空全部数据
+              </button>
+              <span id="reset-data-feedback" class="text-xs font-mono"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+            <div id="panel-ai-settings" class="tab-panel hidden">
+        <div class="bg-white rounded-2xl border border-[#2d2a26]/10 shadow-sm p-6 sm:p-8 w-full">
+          <div class="mb-5">
+            <h2 class="text-lg font-bold text-[#2d2a26] mb-1 flex items-center gap-2">
+              <i class="ri-brain-line text-lg text-orange-800"></i>
+              AI 智能打标设置
+            </h2>
+            <p class="text-xs text-[#2d2a26]/60 font-sans leading-relaxed">
+              配置大模型密钥用于自动提炼单集标签。请按照下方云平台或本地规范配置环境变量。
+            </p>
+          </div>
+          <div class="space-y-6 text-xs font-sans">
+            <div class="bg-[#faf9f7] rounded-xl border border-[#2d2a26]/10 p-4 sm:p-5">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <span class:list={[
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-serif font-bold",
+                      hasServerAiKey ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"
+                    ]}>
+                      <span class:list={["size-2 rounded-full shrink-0", hasServerAiKey ? "bg-emerald-600 animate-pulse" : "bg-amber-600"]}></span>
+                      <span>{hasServerAiKey ? `AI 环境变量已就绪 (${aiEnvProvider})` : "未检测到有效 AI 环境变量"}</span>
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-[#2d2a26]/70 font-serif mt-0.5 leading-relaxed">
+                    {hasServerAiKey
+                      ? `当前生效模型: ${serverAiModel || "默认"} | 预设端点: ${serverAiUrl || "官方默认端点"}。单集自动提炼标签与主题分类已就绪。`
+                      : "系统当前运行在免 Key 启发式模式。可在下方直接填入 Key 保存，也可展开查看配置模板。"}
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  {hasServerAiKey && (
+                    <button
+                      type="button"
+                      id="btn-test-server-ai"
+                      class="px-3.5 py-1.5 rounded-lg bg-[#2d2a26] text-white text-xs font-mono font-bold hover:bg-orange-800 transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      测试连通性
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onclick="window.location.reload()"
+                    class="px-3 py-1.5 rounded-lg border border-[#2d2a26]/20 bg-white text-xs font-mono font-bold hover:bg-orange-50 text-[#2d2a26] transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <i class="ri-refresh-line text-sm text-orange-800"></i>
+                    刷新检测状态
+                  </button>
+                </div>
+              </div>
+              <span id="server-ai-test-feedback" class="hidden text-xs font-mono mt-3 pt-3 border-t border-[#2d2a26]/10"></span>
+            </div>
+
+            <div class="bg-white rounded-xl border border-[#2d2a26]/10 p-5 space-y-4">
+              <div class="border-b border-[#2d2a26]/10 pb-3">
+                <h3 class="text-sm font-bold text-[#2d2a26] font-serif flex items-center gap-2">
+                  <i class="ri-edit-2-line text-orange-800"></i>
+                  快速配置并写入服务环境变量
+                </h3>
+                <p class="text-[11px] text-[#2d2a26]/60 mt-0.5 font-serif">
+                  直接在此填入或更换大模型配置，保存后将自动安全写入 .env 并热加载，无需手动编辑代码文件。
+                </p>
+              </div>
+
+              <form id="ai-config-form" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block font-bold mb-1 font-serif text-xs">大模型服务商 *</label>
+                    <select
+                      id="ai-form-provider"
+                      class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white"
+                    >
+                      <option value="deepseek" selected={aiEnvProvider === "deepseek"}>DeepSeek (推荐，性价比最高)</option>
+                      <option value="zhipu" selected={aiEnvProvider === "zhipu"}>智谱 GLM (国内开箱即用)</option>
+                      <option value="xai" selected={aiEnvProvider === "xai"}>xAI Grok</option>
+                      <option value="openrouter" selected={aiEnvProvider === "openrouter"}>OpenRouter (多模型聚合)</option>
+                      <option value="openai-compatible" selected={aiEnvProvider === "openai-compatible"}>OpenAI 兼容通用接口</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block font-bold mb-1 font-serif text-xs">API Key *</label>
+                    <input
+                      type="password"
+                      id="ai-form-key"
+                      placeholder="填入服务商 API Key (sk-...)"
+                      value={serverAiKey ? "••••••••••••••••" : ""}
+                      class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block font-bold mb-1 font-serif text-xs">API 请求端点 URL</label>
+                    <input
+                      type="url"
+                      id="ai-form-url"
+                      value={serverAiUrl}
+                      placeholder="https://api.deepseek.com/v1/chat/completions"
+                      class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block font-bold mb-1 font-serif text-xs">模型名称 (Model)</label>
+                    <input
+                      type="text"
+                      id="ai-form-model"
+                      value={serverAiModel}
+                      placeholder="deepseek-chat"
+                      class="w-full px-3 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-3 pt-1">
+                  <button
+                    type="submit"
+                    id="btn-save-ai-form"
+                    class="px-4 py-2 rounded-lg bg-[#2d2a26] text-white text-xs font-serif font-bold hover:bg-orange-800 transition-colors inline-flex items-center gap-2 shadow-xs cursor-pointer"
+                  >
+                    <i class="ri-save-line text-sm"></i>
+                    保存并应用到环境变量
+                  </button>
+                  <span id="ai-config-feedback" class="text-xs font-mono"></span>
+                </div>
+              </form>
+            </div>
+
+            <div class="space-y-3">
+              <button
+                type="button"
+                id="btn-toggle-ai-guide"
+                class="w-full flex items-center justify-between p-3.5 bg-[#faf9f7] hover:bg-orange-50/40 border border-[#2d2a26]/10 rounded-xl text-xs font-serif text-[#2d2a26] transition-colors cursor-pointer"
+              >
+                <div class="flex items-center gap-2">
+                  <i class="ri-file-code-line text-orange-800 text-sm"></i>
+                  <span class="font-bold">查看各模型提供商配置模板与部署指引</span>
+                </div>
+                <i class="ri-arrow-down-s-line text-base transition-transform duration-200" id="icon-toggle-ai-guide"></i>
+              </button>
+              <div id="ai-guide-container" class="overflow-hidden transition-all duration-300 ease-in-out opacity-0 pointer-events-none space-y-3.5 pt-1" style="max-height: 0px;">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2d2a26]/10 pb-3">
+                  <div>
+                    <h3 class="text-sm font-bold text-[#2d2a26] flex items-center gap-2 font-serif">
+                      <i class="ri-file-code-line text-orange-800"></i>
+                      选择提供商获取配置模板
+                    </h3>
+                    <p class="text-[11px] text-[#2d2a26]/60 mt-0.5 font-serif">
+                      选择你使用的大模型服务商，直接复制对应变量内容：
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-2.5 self-start sm:self-auto">
+                    <select
+                      id="guide-provider-select"
+                      class="px-3 py-1.5 border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 bg-white font-medium"
+                    >
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="zhipu">智谱</option>
+                      <option value="xai">xAI</option>
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="openai-compatible">OpenAI兼容接口</option>
+                    </select>
+                    <button
+                      type="button"
+                      id="btn-copy-env-template"
+                      class="px-3 py-1.5 rounded-lg border border-[#2d2a26]/20 bg-white hover:bg-orange-50 text-xs font-mono text-orange-950 font-bold transition-colors inline-flex items-center gap-1.5 shadow-xs whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      <i class="ri-file-copy-line text-sm text-orange-800"></i>
+                      复制当前模板
+                    </button>
+                  </div>
+                </div>
+
+                <pre id="env-template-preview" class="p-3.5 sm:p-4 bg-[#2d2a26] text-white/90 rounded-xl font-mono text-xs leading-relaxed overflow-x-auto select-all"></pre>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-0.5">
+                  <div class="p-3.5 sm:p-4 rounded-xl border border-[#2d2a26]/10 bg-[#faf9f7] flex flex-col justify-between gap-2.5">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-1.5 font-bold text-xs text-[#2d2a26]">
+                        <i class="ri-terminal-box-line text-orange-800"></i>
+                        <span>本地开发 / 自建 VPS</span>
+                      </div>
+                      <p class="text-[11px] text-[#2d2a26]/65 leading-relaxed font-serif">
+                        在项目根目录下创建 <code>.env</code> 文件并填入上述变量：
+                      </p>
+                    </div>
+                    <div class="bg-[#2d2a26] text-white/90 px-3 py-1.5 rounded-lg font-mono text-[11px] flex justify-between items-center group">
+                      <code id="text-cmd-local" class="select-all">cp .env.example .env</code>
+                      <button
+                        type="button"
+                        id="btn-copy-cmd-local"
+                        class="text-[10px] font-mono text-stone-300 hover:text-white flex items-center gap-1 transition-colors px-2.5 py-0.5 rounded bg-white/10 hover:bg-white/20 shrink-0 cursor-pointer font-bold"
+                        title="点击复制"
+                      >
+                        <i class="ri-file-copy-line text-xs"></i>
+                        <span>复制</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="p-3.5 sm:p-4 rounded-xl border border-[#2d2a26]/10 bg-[#faf9f7] flex flex-col justify-between gap-2.5">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-1.5 font-bold text-xs text-[#2d2a26]">
+                        <i class="ri-cloud-line text-orange-800"></i>
+                        <span>部署在 Netlify / Vercel 线上平台</span>
+                      </div>
+                      <p class="text-[11px] text-[#2d2a26]/65 leading-relaxed font-serif">
+                        登录云平台后台，在环境变量设置中填入上述变量：
+                      </p>
+                    </div>
+                    <div class="bg-[#2d2a26]/5 border border-[#2d2a26]/10 text-[#2d2a26]/80 px-3 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-2">
+                      <i class="ri-compass-discover-line text-orange-800 text-xs"></i>
+                      <span>平台后台 ➔ Site Settings ➔ Environment Variables</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-12 pt-6 border-t border-[#2d2a26]/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-serif text-[#2d2a26]/60">
+        <div class="flex items-center gap-2">
+          <span class:list={["size-2 rounded-full shrink-0", isFsWritable ? "bg-emerald-600 animate-pulse" : "bg-amber-500"]}></span>
+          <span>{isFsWritable ? "本地开发/独立服务器环境（控制台修改即时写盘持久化生效）" : "托管平台部署（只读文件沙盒，修改请在本地完成并通过 git push 触发云端自动构建）"}</span>
+        </div>
+        <div class="flex items-center gap-4 text-[11px] font-mono">
+          <span>v{currentVersion}</span>
+          <a href="https://github.com/Eyozy/podstarter#readme" target="_blank" rel="noopener noreferrer" class="hover:text-orange-800 transition-colors inline-flex items-center gap-1 font-serif text-xs">
+            <i class="ri-book-open-line text-sm text-orange-800"></i>
+            <span>使用说明与配置 ↗</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <div id="password-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2d2a26]/60 backdrop-blur-sm hidden" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl border border-[#2d2a26]/10 shadow-2xl max-w-md w-full p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+      <div class="flex justify-between items-start">
+        <div class="flex items-center gap-2.5">
+          <div class="size-9 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 flex items-center justify-center shrink-0">
+            <i class="ri-shield-keyhole-line text-lg"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-[#2d2a26] font-serif">修改管理员密码</h3>
+            <p class="text-[11px] text-[#2d2a26]/60 font-serif">更新本地 .env 中的 ADMIN_PASSWORD 并自动续期</p>
+          </div>
+        </div>
+        <button type="button" id="btn-close-password-modal" class="text-[#2d2a26]/40 hover:text-[#2d2a26] p-1 cursor-pointer" aria-label="关闭">
+          <i class="ri-close-line text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block font-bold mb-1 font-serif text-xs text-[#2d2a26]">新管理员密码 *</label>
+          <input
+            type="password"
+            id="admin-new-password"
+            placeholder="输入至少 6 位的新密码"
+            class="w-full px-3.5 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white"
+          />
+        </div>
+        <div>
+          <label class="block font-bold mb-1 font-serif text-xs text-[#2d2a26]">确认新密码 *</label>
+          <input
+            type="password"
+            id="admin-confirm-password"
+            placeholder="再次输入新密码"
+            class="w-full px-3.5 py-2 bg-[#faf9f7] border border-[#2d2a26]/15 rounded-lg font-mono text-xs focus:outline-none focus:border-orange-800 focus:bg-white"
+          />
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-between gap-3 border-t border-[#2d2a26]/10">
+        <span id="change-password-feedback" class="text-xs font-mono"></span>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" id="btn-cancel-password-modal" class="px-3.5 py-2 rounded-lg border border-[#2d2a26]/20 bg-white hover:bg-orange-50 text-xs font-serif font-bold text-[#2d2a26] cursor-pointer">
+            取消
+          </button>
+          <button type="button" id="btn-change-password" class="px-4 py-2 rounded-lg bg-orange-800 hover:bg-orange-900 text-white font-serif text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+            <i class="ri-check-line text-sm"></i>
+            确认修改
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</MainLayout>
+
+<script is:inline define:vars={{ initialMembers: site.about?.members || [], initialVersion: currentVersion, envTemplates }}>
+  function initAdminConsole() {
+    const consoleRoot = document.querySelector("[data-admin-console]");
+    if (!consoleRoot || consoleRoot.dataset.bound === "true") return;
+    consoleRoot.dataset.bound = "true";
+    function escapeAttr(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    const descTextarea = document.getElementById("podcast-description-input");
+    if (descTextarea) {
+      const resize = () => {
+        descTextarea.style.height = "auto";
+        descTextarea.style.height = Math.max(72, descTextarea.scrollHeight) + "px";
+      };
+      descTextarea.addEventListener("input", resize);
+      requestAnimationFrame(resize);
+      setTimeout(resize, 100);
+    }
+
+    document.getElementById("btn-logout")?.addEventListener("click", async () => {
+      await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      });
+      window.location.href = "/";
+    });
+
+    try {
+      fetch("https://api.github.com/repos/Eyozy/podstarter/releases/latest")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.tag_name) {
+            const upstreamVer = String(data.tag_name).replace(/^v/i, "");
+            if (upstreamVer && upstreamVer !== initialVersion) {
+              const banner = document.getElementById("upstream-version-banner");
+              const title = document.getElementById("upstream-version-title");
+              if (banner && title) {
+                title.textContent = `检测到 PodStarter 模板发布了新版本 v${upstreamVer}（当前 v${initialVersion}）！`;
+                banner.classList.remove("hidden");
+              }
+            }
+          }
+        })
+        .catch(() => {});
+    } catch {}
+
+    const quickRssUrl = document.getElementById("quick-rss-url");
+    const btnQuickSyncRss = document.getElementById("btn-quick-sync-rss");
+    const quickRssMeta = document.getElementById("quick-rss-meta-checkbox");
+    const quickRssFeedback = document.getElementById("quick-rss-feedback");
+
+    btnQuickSyncRss?.addEventListener("click", async () => {
+      const url = quickRssUrl?.value?.trim();
+      if (!url) {
+        window.toast?.warning("请先粘贴播客主页链接或 RSS 订阅源地址");
+        return;
+      }
+
+      btnQuickSyncRss.disabled = true;
+      btnQuickSyncRss.textContent = "正在抓取解析...";
+      if (quickRssFeedback) {
+        quickRssFeedback.className = "text-xs font-mono text-orange-300";
+        quickRssFeedback.textContent = "正在智能识别平台并解析全量节目，请稍候...";
+      }
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "sync-rss",
+            rssUrl: url,
+            updateSiteMeta: quickRssMeta?.checked !== false,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (quickRssFeedback) {
+            quickRssFeedback.className = "text-xs font-mono text-emerald-400";
+            const platformTag = data.platform ? ` [平台: ${data.platform}]` : "";
+            quickRssFeedback.textContent = `成功导入《${data.podcastTitle}》共 ${data.count} 期节目${platformTag}！页面即将刷新...`;
+          }
+          setTimeout(() => {
+            window.location.reload();
+          }, 1200);
+        } else {
+          const err = "解析失败: " + (data.error || "未知错误");
+          window.toast?.error(err);
+          btnQuickSyncRss.disabled = false;
+          btnQuickSyncRss.textContent = "一键解析导入";
+          if (quickRssFeedback) quickRssFeedback.textContent = "";
+        }
+      } catch (err) {
+        const errTxt = "网络请求异常: " + err.message;
+        window.toast?.error(errTxt);
+        btnQuickSyncRss.disabled = false;
+        btnQuickSyncRss.textContent = "一键解析导入";
+        if (quickRssFeedback) quickRssFeedback.textContent = "";
+      }
+    });
+
+
+    const searchInput = document.getElementById("episode-search");
+    const filterStatus = document.getElementById("filter-status");
+    const rows = document.querySelectorAll(".episode-row");
+
+    function applyFilter() {
+      const q = (searchInput?.value || "").trim().toLowerCase();
+      const status = filterStatus?.value || "all";
+
+      rows.forEach((row) => {
+        const title = row.getAttribute("data-title") || "";
+        const id = row.getAttribute("data-id") || "";
+        const epStatus = row.getAttribute("data-status") || "";
+
+        const matchesQuery = !q || title.includes(q) || id.includes(q);
+        const matchesStatus = status === "all" || epStatus === status;
+
+        if (matchesQuery && matchesStatus) {
+          row.classList.remove("hidden");
+        } else {
+          row.classList.add("hidden");
+        }
+      });
+    }
+
+    searchInput?.addEventListener("input", applyFilter);
+    filterStatus?.addEventListener("change", applyFilter);
+
+    document.querySelectorAll(".delete-episode-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        const title = btn.getAttribute("data-title");
+        if (!id) return;
+
+        if (!confirm(`确定要从本地数据库中删除单集《${title}》吗？\n对应的文字稿也会被清理。`)) {
+          return;
+        }
+
+        btn.textContent = "删除中...";
+        try {
+          const res = await fetch("/api/admin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "delete-episode", episodeId: id }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            const row = btn.closest(".episode-row");
+            if (row) {
+              row.style.transition = "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)";
+              row.style.opacity = "0";
+              row.style.transform = "translateX(16px)";
+              setTimeout(() => {
+                row.remove();
+              }, 250);
+            }
+          } else {
+            btn.textContent = "删除";
+          }
+        } catch (err) {
+          const errTxt = "请求异常: " + err.message;
+          window.toast?.error(errTxt);
+          btn.textContent = "删除";
+        }
+      });
+    });
+
+    document.querySelectorAll(".simulate-play-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        if (!id) return;
+        btn.disabled = true;
+        btn.textContent = "上报中...";
+
+        try {
+          const res = await fetch("/api/play", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ episodeId: id }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data?.error || `HTTP ${res.status}`);
+          }
+          if (data?.success) {
+            const badge = btn.closest(".episode-row")?.querySelector(".play-count-badge");
+            if (badge) badge.textContent = String(data.count);
+            const totalMetric = document.getElementById("metric-total-plays");
+            if (totalMetric) totalMetric.textContent = String(Number(totalMetric.textContent || "0") + 1);
+            btn.textContent = "+1 成功";
+            setTimeout(() => {
+              btn.textContent = "+1 试听";
+              btn.disabled = false;
+            }, 1200);
+          }
+        } catch {
+          btn.textContent = "失败";
+          setTimeout(() => {
+            btn.textContent = "+1 试听";
+            btn.disabled = false;
+          }, 1200);
+        }
+      });
+    });
+
+    const rawSubtitles = document.getElementById("raw-subtitles-input");
+    const convertedOutput = document.getElementById("converted-markdown-output");
+    const convertBtn = document.getElementById("btn-convert-subtitles");
+    const loadSampleBtn = document.getElementById("load-sample-srt");
+    const loadSampleMixedBtn = document.getElementById("load-sample-mixed");
+    const copyMdBtn = document.getElementById("btn-copy-markdown");
+    const saveTranscriptBtn = document.getElementById("btn-save-transcript-file");
+    const bindEpisodeSelect = document.getElementById("bind-episode-select");
+    const saveFeedback = document.getElementById("save-transcript-feedback");
+
+    loadSampleBtn?.addEventListener("click", () => {
+      if (rawSubtitles) {
+        rawSubtitles.value = `1\n00:00:02,000 --> 00:00:06,000\n[主播 A]: 欢迎收听 PodStarter 播客节目。\n\n2\n00:00:07,000 --> 00:00:12,500\n[主播 B]: 今天我们聊聊如何通过独立站掌控播客主权。`;
+      }
+    });
+
+    loadSampleMixedBtn?.addEventListener("click", () => {
+      if (rawSubtitles) {
+        rawSubtitles.value = `00:02:05 [主播 A] 很高兴污染你的房间。\n02:15 嘉宾：今天我们聊聊怎么制造变化。\n01:05:20 **主播 B**: 新的骨骼会从旧伤的钙化里生长出来。\n10:30 时间节点示例：从沙漠到工位。`;
+      }
+    });
+
+    convertBtn?.addEventListener("click", async () => {
+      const text = rawSubtitles?.value || "";
+      if (!text.trim()) {
+        window.toast?.warning("请先输入或粘贴字幕内容");
+        return;
+      }
+
+      convertBtn.disabled = true;
+      convertBtn.textContent = "智能解析中...";
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "convert-subtitles", subtitles: text }),
+        });
+        const data = await res.json();
+        if (data.success && convertedOutput) {
+          convertedOutput.value = data.markdown;
+        } else {
+          const err = "解析失败: " + (data.error || "未能识别到时间戳");
+          window.toast?.error(err);
+        }
+      } catch (err) {
+        const errTxt = "网络错误: " + err.message;
+        window.toast?.error(errTxt);
+      } finally {
+        convertBtn.disabled = false;
+        convertBtn.textContent = "开始智能解析转化";
+      }
+    });
+
+    copyMdBtn?.addEventListener("click", () => {
+      if (convertedOutput && convertedOutput.value) {
+        navigator.clipboard.writeText(convertedOutput.value);
+        copyMdBtn.textContent = "已复制";
+        setTimeout(() => (copyMdBtn.textContent = "复制 Markdown"), 1500);
+      }
+    });
+
+    saveTranscriptBtn?.addEventListener("click", async () => {
+      const md = convertedOutput?.value;
+      const episodeId = bindEpisodeSelect?.value;
+      if (!episodeId) {
+        window.toast?.warning("请选择要绑定的单集");
+        return;
+      }
+      if (!md) {
+        window.toast?.warning("文字稿内容为空，请先转换字幕");
+        return;
+      }
+
+      saveTranscriptBtn.disabled = true;
+      if (saveFeedback) saveFeedback.textContent = "正在写入文件...";
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save-transcript", episodeId, markdown: md }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (saveFeedback) {
+            saveFeedback.className = "text-[11px] font-mono mt-1 block text-emerald-700";
+            saveFeedback.textContent = `已成功写入 src/content/transcripts/${data.filePath}`;
+          }
+        } else {
+          if (saveFeedback) {
+            saveFeedback.className = "text-[11px] font-mono mt-1 block text-red-700";
+            saveFeedback.textContent = "保存失败: " + data.error;
+          }
+        }
+      } catch (err) {
+        if (saveFeedback) {
+          saveFeedback.className = "text-[11px] font-mono mt-1 block text-red-700";
+          saveFeedback.textContent = "请求异常: " + err.message;
+        }
+      } finally {
+        saveTranscriptBtn.disabled = false;
+      }
+    });
+
+
+    const membersContainer = document.getElementById("members-container");
+    const btnAddMember = document.getElementById("btn-add-member");
+
+    let membersData = Array.isArray(initialMembers) ? JSON.parse(JSON.stringify(initialMembers)) : [];
+
+    function renderMembersUI() {
+      if (!membersContainer) return;
+      membersContainer.innerHTML = "";
+
+      if (membersData.length === 0) {
+        membersContainer.innerHTML = `
+          <div class="p-6 text-center border border-dashed border-[#2d2a26]/15 rounded-xl bg-[#faf9f7] text-[#2d2a26]/50 text-xs">
+            暂无团队成员。点击右上角“添加成员”即可配置主播与制作人员。
+          </div>
+        `;
+        return;
+      }
+
+      membersData.forEach((member, mIdx) => {
+        const card = document.createElement("div");
+        card.className = "member-card-item member-card-enter p-4 sm:p-5 rounded-xl border border-[#2d2a26]/10 bg-[#faf9f7] relative space-y-3 transition-all duration-200";
+        card.innerHTML = `
+          <div class="flex justify-between items-center pb-2 border-b border-[#2d2a26]/5">
+            <span class="font-mono text-xs font-bold text-orange-800">成员 #${mIdx + 1}</span>
+            <button type="button" class="btn-delete-member text-xs text-red-700 hover:text-red-900 font-mono hover:underline" data-idx="${mIdx}">
+              删除此成员
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-[11px] mb-1">主播姓名 / 昵称 *</label>
+              <input type="text" class="member-name-input w-full px-3 py-1.5 bg-white border border-[#2d2a26]/15 rounded-lg text-xs font-sans focus:outline-none focus:border-orange-800" value="${escapeAttr(member.name)}" placeholder="如：小张" required data-idx="${mIdx}" />
+            </div>
+            <div>
+              <label class="block font-bold text-[11px] mb-1">角色 / 头衔 (选填，留空则前台不显示)</label>
+              <input type="text" class="member-role-input w-full px-3 py-1.5 bg-white border border-[#2d2a26]/15 rounded-lg text-xs font-sans focus:outline-none focus:border-orange-800" value="${escapeAttr(member.role)}" placeholder="如：主播 / 剪辑制作" data-idx="${mIdx}" />
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-1">
+            <div class="flex justify-between items-center">
+              <label class="block font-bold text-[11px] text-[#2d2a26]/70">社交主页链接 (支持添加多条：小红书、微博、公众号、即刻等)</label>
+              <button type="button" class="btn-add-link text-[11px] font-mono text-orange-800 hover:underline font-bold" data-idx="${mIdx}">
+                + 添加主页链接
+              </button>
+            </div>
+            <div class="links-list space-y-2" data-idx="${mIdx}">
+              ${(member.links || []).map((l, lIdx) => `
+                <div class="link-item-row flex items-center gap-2 transition-all duration-150">
+                  <input type="text" class="link-label-input w-28 px-2.5 py-1 bg-white border border-[#2d2a26]/15 rounded-lg text-xs font-sans focus:outline-none focus:border-orange-800" value="${escapeAttr(l.label)}" placeholder="平台名称" data-midx="${mIdx}" data-lidx="${lIdx}" />
+                  <input type="url" class="link-url-input flex-1 px-2.5 py-1 bg-white border border-[#2d2a26]/15 rounded-lg text-xs font-mono focus:outline-none focus:border-orange-800" value="${escapeAttr(l.url)}" placeholder="https://..." data-midx="${mIdx}" data-lidx="${lIdx}" />
+                  <button type="button" class="btn-del-link text-[11px] text-red-600 hover:text-red-800 px-1 font-mono" data-midx="${mIdx}" data-lidx="${lIdx}">✕</button>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+        membersContainer.appendChild(card);
+      });
+
+      membersContainer.querySelectorAll(".member-name-input").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const idx = Number(inp.dataset.idx);
+          if (membersData[idx]) membersData[idx].name = e.target.value;
+        });
+      });
+
+      membersContainer.querySelectorAll(".member-role-input").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const idx = Number(inp.dataset.idx);
+          if (membersData[idx]) membersData[idx].role = e.target.value;
+        });
+      });
+
+      membersContainer.querySelectorAll(".link-label-input").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const midx = Number(inp.dataset.midx);
+          const lidx = Number(inp.dataset.lidx);
+          if (membersData[midx]?.links?.[lidx]) {
+            membersData[midx].links[lidx].label = e.target.value;
+          }
+        });
+      });
+
+      membersContainer.querySelectorAll(".link-url-input").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const midx = Number(inp.dataset.midx);
+          const lidx = Number(inp.dataset.lidx);
+          if (membersData[midx]?.links?.[lidx]) {
+            membersData[midx].links[lidx].url = e.target.value;
+          }
+        });
+      });
+
+      membersContainer.querySelectorAll(".btn-delete-member").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.dataset.idx);
+          const card = btn.closest(".member-card-item");
+          if (card) {
+            card.style.transition = "all 0.22s cubic-bezier(0.4, 0, 0.2, 1)";
+            card.style.opacity = "0";
+            card.style.transform = "scale(0.97) translateY(-6px)";
+            setTimeout(() => {
+              membersData.splice(idx, 1);
+              renderMembersUI();
+            }, 200);
+          } else {
+            membersData.splice(idx, 1);
+            renderMembersUI();
+          }
+        });
+      });
+
+      membersContainer.querySelectorAll(".btn-add-link").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.dataset.idx);
+          if (!membersData[idx].links) membersData[idx].links = [];
+          membersData[idx].links.push({ label: "社交主页", url: "" });
+          renderMembersUI();
+        });
+      });
+
+      membersContainer.querySelectorAll(".btn-del-link").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const midx = Number(btn.dataset.midx);
+          const lidx = Number(btn.dataset.lidx);
+          const row = btn.closest(".link-item-row");
+          if (row) {
+            row.style.transition = "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)";
+            row.style.opacity = "0";
+            row.style.transform = "translateX(12px)";
+            setTimeout(() => {
+              if (membersData[midx]?.links) {
+                membersData[midx].links.splice(lidx, 1);
+                renderMembersUI();
+              }
+            }, 180);
+          } else if (membersData[midx]?.links) {
+            membersData[midx].links.splice(lidx, 1);
+            renderMembersUI();
+          }
+        });
+      });
+    }
+    btnAddMember?.addEventListener("click", () => {
+      membersData.push({
+        name: "",
+        role: "",
+        links: [{ label: "社交主页", url: "" }],
+      });
+      renderMembersUI();
+    });
+
+    renderMembersUI();
+
+    const aboutForm = document.getElementById("about-form");
+    const aboutFeedback = document.getElementById("about-form-feedback");
+
+    aboutForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(aboutForm);
+
+      const cleanedMembers = membersData
+        .filter((m) => m && m.name && m.name.trim())
+        .map((m) => ({
+          name: m.name.trim(),
+          role: m.role ? m.role.trim() : undefined,
+          links: (m.links || [])
+            .filter((l) => l && l.url && l.url.trim())
+            .map((l) => ({
+              label: l.label ? l.label.trim() : "社交主页",
+              url: l.url.trim(),
+            })),
+        }));
+
+      const aboutPayload = {
+        title: formData.get("aboutTitle"),
+        tagline: formData.get("aboutTagline"),
+        intro: formData.get("aboutIntro"),
+        membersTitle: "主播与团队成员",
+        members: cleanedMembers,
+        contact: {
+          title: formData.get("contactTitle") || "联系我们",
+          description: formData.get("contactDesc") || "如有合作或来信，欢迎发送邮件至：",
+          email: formData.get("contactEmail"),
+        },
+        feedback: {
+          title: formData.get("feedbackTitle") || "网站反馈",
+          description: formData.get("feedbackDesc") || "如果你对节目有任何建议或想听的选题：",
+          formUrl: formData.get("feedbackUrl"),
+          formButtonText: formData.get("feedbackButtonText") || "填写反馈表单",
+          channels: [],
+        },
+      };
+      const heroPayload = {
+        titlePrefix: String(formData.get("heroTitlePrefix") ?? "").trim(),
+        titleHighlight: String(formData.get("heroTitleHighlight") ?? "").trim(),
+        titleSuffix: String(formData.get("heroTitleSuffix") ?? "").trim(),
+        description: String(formData.get("heroDescription") ?? "").trim(),
+        cta: {
+          listenLatestLabel: String(formData.get("ctaListenLabel") ?? "").trim(),
+          browseAllDesktopLabel: String(formData.get("ctaBrowseLabel") ?? "").trim(),
+        },
+      };
+
+      const footerPayload = {
+        descriptionLine1: String(formData.get("footerLine1") ?? "").trim(),
+        descriptionLine2: String(formData.get("footerLine2") ?? "").trim(),
+      };
+
+      const assetsPayload = {
+        defaultCover: String(formData.get("defaultCover") ?? "").trim(),
+        ogImage: String(formData.get("ogImage") ?? "").trim(),
+        favicon: String(formData.get("favicon") ?? "").trim(),
+      };
+
+      const transcriptsPayload = {
+        placeholderNotice: String(formData.get("transcriptsPlaceholder") ?? "").trim(),
+      };
+
+      const shareCardPayload = {
+        title: String(formData.get("shareCardTitle") ?? "").trim(),
+        downloadLabel: String(formData.get("shareCardDownloadLabel") ?? "").trim(),
+        qrLabel: String(formData.get("shareCardQrLabel") ?? "").trim(),
+        generatingLabel: String(formData.get("shareCardGeneratingLabel") ?? "").trim(),
+        generateErrorMessage: String(formData.get("shareCardErrorLabel") ?? "").trim(),
+        filenamePrefix: String(formData.get("shareCardFilenamePrefix") ?? "").trim(),
+      };
+
+      const pagesPayload = {
+        episodes: {
+          emptyTitle: String(formData.get("episodesEmptyTitle") ?? "").trim(),
+          emptySubtitle: String(formData.get("episodesEmptySubtitle") ?? "").trim(),
+        },
+      };
+
+      const submitBtn = aboutForm.querySelector('button[type="submit"]');
+      if (aboutFeedback) {
+        aboutFeedback.className = "text-xs font-mono text-orange-600";
+        aboutFeedback.textContent = "正在保存主播团队与文案外观设置...";
+      }
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "正在保存...";
+      }
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save-about",
+            about: aboutPayload,
+            hero: heroPayload,
+            footer: footerPayload,
+            assets: assetsPayload,
+            transcripts: transcriptsPayload,
+            shareCard: shareCardPayload,
+            pages: pagesPayload,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (aboutFeedback) {
+            aboutFeedback.className = "text-xs font-mono text-emerald-700 font-bold";
+            aboutFeedback.textContent = "✓ 主播团队、关于页与外观文案已成功保存！";
+          }
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "✓ 保存成功";
+            setTimeout(() => {
+              submitBtn.innerHTML = '<i class="ri-check-line text-sm"></i> 保存关于页与外观文案设置';
+            }, 2000);
+          }
+        } else {
+          if (aboutFeedback) {
+            aboutFeedback.className = "text-xs font-mono text-red-700";
+            aboutFeedback.textContent = "保存失败: " + data.error;
+          }
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="ri-check-line text-sm"></i> 保存关于页与外观文案设置';
+          }
+        }
+      } catch (err) {
+        if (aboutFeedback) {
+          aboutFeedback.className = "text-xs font-mono text-red-700";
+          aboutFeedback.textContent = "异常: " + err.message;
+        }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="ri-check-line text-sm"></i> 保存关于页与外观文案设置';
+        }
+      }
+    });
+
+    const configForm = document.getElementById("config-form");
+    const configFeedback = document.getElementById("config-form-feedback");
+    const featureTranscriptsCheckbox = document.getElementById("feature-transcripts-checkbox");
+    const featureAiTaggingCheckbox = document.getElementById("feature-ai-tagging-checkbox");
+    const featureThemesCheckbox = document.getElementById("feature-themes-checkbox");
+    document.querySelectorAll(".btn-copy-command").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const cmd = btn.getAttribute("data-copy") || "";
+        if (!cmd) return;
+        navigator.clipboard.writeText(cmd);
+        const span = btn.querySelector("span");
+        if (span) {
+          const oldText = span.textContent;
+          span.textContent = "已复制 ✓";
+          setTimeout(() => {
+            span.textContent = oldText;
+          }, 1500);
+        }
+        window.toast?.success(`已复制终端命令: ${cmd}`);
+      });
+    });
+
+    configForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitBtn = configForm.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "正在保存...";
+      }
+      if (configFeedback) {
+        configFeedback.className = "text-xs font-mono text-orange-600";
+        configFeedback.textContent = "正在保存平台与功能配置...";
+      }
+
+      const formData = new FormData(configForm);
+
+      const payload = {
+        action: "save-config",
+        brandName: String(formData.get("brandName") || "").trim(),
+        establishedYear: Number(formData.get("establishedYear")) || new Date().getFullYear(),
+        description: String(formData.get("description") || "").trim(),
+        rssUrl: String(formData.get("rssUrl") || "").trim(),
+        appleUrl: String(formData.get("appleUrl") || "").trim(),
+        xiaoyuzhouUrl: String(formData.get("xiaoyuzhouUrl") || "").trim(),
+        ximalayaUrl: String(formData.get("ximalayaUrl") || "").trim(),
+        spotifyUrl: String(formData.get("spotifyUrl") || "").trim(),
+        neteaseUrl: String(formData.get("neteaseUrl") || "").trim(),
+        wechatQr: String(formData.get("wechatQr") || "").trim(),
+        xiaoyuzhouQr: String(formData.get("xiaoyuzhouQr") || "").trim(),
+        featureTranscripts: featureTranscriptsCheckbox?.checked === true,
+        featureAiTagging: featureAiTaggingCheckbox?.checked === true,
+        featureThemes: featureThemesCheckbox?.checked === true,
+      };
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (configFeedback) {
+            configFeedback.className = "text-xs font-mono text-emerald-700 font-bold";
+            configFeedback.textContent = "✓ 站点与分发配置已成功保存！页面即将刷新生效...";
+          }
+          if (submitBtn) {
+            submitBtn.textContent = "✓ 保存成功";
+          }
+          setTimeout(() => {
+            window.location.reload();
+          }, 800);
+        } else {
+          if (configFeedback) {
+            configFeedback.className = "text-xs font-mono text-red-700";
+            configFeedback.textContent = "保存失败: " + (data.error || "未知异常");
+          }
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "保存站点与分发配置";
+          }
+        }
+      } catch (err) {
+        if (configFeedback) {
+          configFeedback.className = "text-xs font-mono text-red-700";
+          configFeedback.textContent = "网络异常: " + err.message;
+        }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "保存站点与分发配置";
+        }
+      }
+    });
+
+    const btnResetData = document.getElementById("btn-reset-all-data");
+    const resetFeedback = document.getElementById("reset-data-feedback");
+    btnResetData?.addEventListener("click", async () => {
+      const confirmed = window.confirm("⚠️ 确定要重置并清空所有播客数据吗？\n\n此操作将清空：\n- 全部单集列表 (episodes.json)\n- 主题分类数据 (themes.json)\n- 生成的文字稿文件\n- RSS 订阅地址缓存\n\n重置后需在上方重新解析导入你的新播客 RSS 地址。确认继续？");
+      if (!confirmed) return;
+
+      btnResetData.disabled = true;
+      btnResetData.textContent = "正在重置数据...";
+      if (resetFeedback) {
+        resetFeedback.className = "text-xs font-mono text-orange-800";
+        resetFeedback.textContent = "正在清空本地数据与缓存...";
+      }
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "reset-data" }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (resetFeedback) {
+            resetFeedback.className = "text-xs font-mono text-emerald-700 font-bold";
+            resetFeedback.textContent = "✓ 重置完成！已清空历史数据，即将刷新控制台...";
+          }
+          setTimeout(() => window.location.reload(), 1200);
+        } else {
+          if (resetFeedback) {
+            resetFeedback.className = "text-xs font-mono text-red-600";
+            resetFeedback.textContent = "重置失败: " + (data.error || "未知异常");
+          }
+          btnResetData.disabled = false;
+          btnResetData.textContent = "一键重置清空全部数据";
+        }
+      } catch (err) {
+        if (resetFeedback) {
+          resetFeedback.className = "text-xs font-mono text-red-600";
+          resetFeedback.textContent = "网络异常: " + err.message;
+        }
+        btnResetData.disabled = false;
+        btnResetData.textContent = "一键重置清空全部数据";
+      }
+    });
+
+    const passwordModal = document.getElementById("password-modal");
+    const btnOpenPasswordModal = document.getElementById("btn-open-password-modal");
+    const btnClosePasswordModal = document.getElementById("btn-close-password-modal");
+    const btnCancelPasswordModal = document.getElementById("btn-cancel-password-modal");
+
+    const togglePasswordModal = (open) => {
+      if (!passwordModal) return;
+      if (open) {
+        passwordModal.classList.remove("hidden");
+        if (passwordFeedback) passwordFeedback.textContent = "";
+        setTimeout(() => inputNewPass?.focus(), 80);
+      } else {
+        passwordModal.classList.add("hidden");
+      }
+    };
+
+    btnOpenPasswordModal?.addEventListener("click", () => togglePasswordModal(true));
+    btnClosePasswordModal?.addEventListener("click", () => togglePasswordModal(false));
+    btnCancelPasswordModal?.addEventListener("click", () => togglePasswordModal(false));
+    passwordModal?.addEventListener("click", (e) => {
+      if (e.target === passwordModal) togglePasswordModal(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && passwordModal && !passwordModal.classList.contains("hidden")) {
+        togglePasswordModal(false);
+      }
+    });
+
+    const btnChangePassword = document.getElementById("btn-change-password");
+    const inputNewPass = document.getElementById("admin-new-password");
+    const inputConfirmPass = document.getElementById("admin-confirm-password");
+    const passwordFeedback = document.getElementById("change-password-feedback");
+
+    btnChangePassword?.addEventListener("click", async () => {
+      const newPassword = inputNewPass?.value?.trim() || "";
+      const confirmPassword = inputConfirmPass?.value?.trim() || "";
+
+      if (!newPassword || newPassword.length < 6) {
+        if (passwordFeedback) {
+          passwordFeedback.className = "text-xs font-mono text-red-600";
+          passwordFeedback.textContent = "新密码长度至少需要 6 位";
+        }
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        if (passwordFeedback) {
+          passwordFeedback.className = "text-xs font-mono text-red-600";
+          passwordFeedback.textContent = "两次输入的密码不一致，请重新检查";
+        }
+        return;
+      }
+
+      btnChangePassword.disabled = true;
+      btnChangePassword.textContent = "正在更新密码...";
+      if (passwordFeedback) {
+        passwordFeedback.className = "text-xs font-mono text-orange-800";
+        passwordFeedback.textContent = "正在写入环境配置...";
+      }
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "change-password", newPassword }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (passwordFeedback) {
+            passwordFeedback.className = "text-xs font-mono text-emerald-700 font-bold";
+            passwordFeedback.textContent = "✓ 管理员密码已成功更新并写入 .env！当前会话已自动续期。";
+          }
+          if (inputNewPass) inputNewPass.value = "";
+          if (inputConfirmPass) inputConfirmPass.value = "";
+        } else {
+          if (passwordFeedback) {
+            passwordFeedback.className = "text-xs font-mono text-red-600";
+            passwordFeedback.textContent = "更新失败: " + (data.error || "未知错误");
+          }
+        }
+      } catch (err) {
+        if (passwordFeedback) {
+          passwordFeedback.className = "text-xs font-mono text-red-600";
+          passwordFeedback.textContent = "网络异常: " + err.message;
+        }
+      } finally {
+        btnChangePassword.disabled = false;
+        btnChangePassword.textContent = "更新管理员密码";
+      }
+    });
+
+    const btnTestServerAi = document.getElementById("btn-test-server-ai");
+    const serverAiFeedback = document.getElementById("server-ai-test-feedback");
+    const guideProviderSelect = document.getElementById("guide-provider-select");
+    const envTemplatePreview = document.getElementById("env-template-preview");
+    const btnCopyEnvTemplate = document.getElementById("btn-copy-env-template");
+
+    function updateEnvTemplate() {
+      const provider = guideProviderSelect?.value || "zhipu";
+      if (envTemplatePreview) {
+        envTemplatePreview.textContent = envTemplates[provider] || envTemplates.zhipu || "";
+      }
+    }
+
+    guideProviderSelect?.addEventListener("change", updateEnvTemplate);
+    updateEnvTemplate();
+
+    btnCopyEnvTemplate?.addEventListener("click", () => {
+      if (envTemplatePreview?.textContent) {
+        navigator.clipboard.writeText(envTemplatePreview.textContent);
+        btnCopyEnvTemplate.textContent = "已复制配置 ✓";
+        setTimeout(() => {
+          btnCopyEnvTemplate.textContent = "复制配置模板";
+        }, 1500);
+      }
+    });
+
+    const btnToggleAiGuide = document.getElementById("btn-toggle-ai-guide");
+    const aiGuideContainer = document.getElementById("ai-guide-container");
+    const iconToggleAiGuide = document.getElementById("icon-toggle-ai-guide");
+    let isAiGuideExpanded = false;
+
+    btnToggleAiGuide?.addEventListener("click", () => {
+      if (!aiGuideContainer) return;
+      isAiGuideExpanded = !isAiGuideExpanded;
+      if (isAiGuideExpanded) {
+        aiGuideContainer.style.maxHeight = (aiGuideContainer.scrollHeight + 60) + "px";
+        aiGuideContainer.style.opacity = "1";
+        aiGuideContainer.classList.remove("pointer-events-none");
+        iconToggleAiGuide?.classList.add("rotate-180");
+      } else {
+        aiGuideContainer.style.maxHeight = "0px";
+        aiGuideContainer.style.opacity = "0";
+        aiGuideContainer.classList.add("pointer-events-none");
+        iconToggleAiGuide?.classList.remove("rotate-180");
+      }
+    });
+
+    const AI_DEFAULTS = {
+      deepseek: { url: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
+      zhipu: { url: "https://open.bigmodel.cn/api/paas/v4/chat/completions", model: "glm-4-flash" },
+      xai: { url: "https://api.x.ai/v1/chat/completions", model: "grok-beta" },
+      openrouter: { url: "https://openrouter.ai/api/v1/chat/completions", model: "openai/gpt-4o-mini" },
+      "openai-compatible": { url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
+    };
+
+    const aiFormProvider = document.getElementById("ai-form-provider");
+    const aiFormUrl = document.getElementById("ai-form-url");
+    const aiFormModel = document.getElementById("ai-form-model");
+    const aiFormKey = document.getElementById("ai-form-key");
+
+    aiFormProvider?.addEventListener("change", () => {
+      const selected = aiFormProvider.value;
+      const def = AI_DEFAULTS[selected];
+      if (def) {
+        if (aiFormUrl && (!aiFormUrl.value || aiFormUrl.value.includes("api."))) {
+          aiFormUrl.value = def.url;
+        }
+        if (aiFormModel) {
+          aiFormModel.value = def.model;
+        }
+      }
+    });
+
+    const aiConfigForm = document.getElementById("ai-config-form");
+    const aiConfigFeedback = document.getElementById("ai-config-feedback");
+    const btnSaveAiForm = document.getElementById("btn-save-ai-form");
+
+    aiConfigForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!btnSaveAiForm) return;
+      btnSaveAiForm.disabled = true;
+      btnSaveAiForm.textContent = "正在保存并生效...";
+      if (aiConfigFeedback) {
+        aiConfigFeedback.className = "text-xs font-mono text-orange-800";
+        aiConfigFeedback.textContent = "正在写入服务环境并热加载...";
+      }
+
+      const provider = aiFormProvider?.value || "deepseek";
+      const rawKey = aiFormKey?.value?.trim() || "";
+      const apiKey = rawKey.includes("••••") ? "" : rawKey;
+      const apiUrl = aiFormUrl?.value?.trim() || "";
+      const model = aiFormModel?.value?.trim() || "";
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save-ai-config",
+            provider,
+            apiKey,
+            apiUrl,
+            model,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (aiConfigFeedback) {
+            aiConfigFeedback.className = "text-xs font-mono text-emerald-700";
+            aiConfigFeedback.textContent = "保存成功！已安全应用到本地环境，正在刷新状态...";
+          }
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          if (aiConfigFeedback) {
+            aiConfigFeedback.className = "text-xs font-mono text-red-600";
+            aiConfigFeedback.textContent = `保存失败: ${data.error || "未知异常"}`;
+          }
+          btnSaveAiForm.disabled = false;
+          btnSaveAiForm.textContent = "保存并应用到环境变量";
+        }
+      } catch (err) {
+        if (aiConfigFeedback) {
+          aiConfigFeedback.className = "text-xs font-mono text-red-600";
+          aiConfigFeedback.textContent = `请求异常: ${err.message}`;
+        }
+        btnSaveAiForm.disabled = false;
+        btnSaveAiForm.textContent = "保存并应用到环境变量";
+      }
+    });
+
+    const btnCopyCmdLocal = document.getElementById("btn-copy-cmd-local");
+    const textCmdLocal = document.getElementById("text-cmd-local");
+    btnCopyCmdLocal?.addEventListener("click", () => {
+      if (textCmdLocal?.textContent) {
+        navigator.clipboard.writeText(textCmdLocal.textContent.trim());
+        const span = btnCopyCmdLocal.querySelector("span");
+        if (span) span.textContent = "已复制 ✓";
+        setTimeout(() => {
+          if (span) span.textContent = "复制";
+        }, 1500);
+      }
+    });
+    let isTestingAi = false;
+    async function testServerAi() {
+      if (isTestingAi || !btnTestServerAi) return;
+      isTestingAi = true;
+      btnTestServerAi.disabled = true;
+      btnTestServerAi.textContent = "正在握手测试...";
+      if (serverAiFeedback) {
+        serverAiFeedback.className = "text-xs font-mono text-orange-800 mt-2.5 pt-2.5 border-t border-[#2d2a26]/10 block";
+        serverAiFeedback.textContent = "正在使用服务器当前环境变量发送轻量测试请求...";
+      }
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "test-ai" }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.success) {
+          const successMsg = `连通成功 (${data.duration}ms)`;
+          if (serverAiFeedback) {
+            serverAiFeedback.className = "text-xs font-mono text-emerald-700 mt-2.5 pt-2.5 border-t border-[#2d2a26]/10 block";
+            serverAiFeedback.textContent = successMsg;
+          }
+          window.toast?.success(successMsg);
+        } else {
+          const errMsg = `测试失败: ${data.error || "未通过连通性验证"}`;
+          if (serverAiFeedback) {
+            serverAiFeedback.className = "text-xs font-mono text-red-600 mt-2.5 pt-2.5 border-t border-[#2d2a26]/10 block";
+            serverAiFeedback.textContent = errMsg;
+          }
+          window.toast?.error(errMsg);
+        }
+      } catch (err) {
+        const errTxt = `网络请求异常: ${err?.message || "请稍后重试"}`;
+        if (serverAiFeedback) {
+          serverAiFeedback.className = "text-xs font-mono text-red-600 mt-2.5 pt-2.5 border-t border-[#2d2a26]/10 block";
+          serverAiFeedback.textContent = errTxt;
+        }
+        window.toast?.error(errTxt);
+      } finally {
+        isTestingAi = false;
+        btnTestServerAi.disabled = false;
+        btnTestServerAi.textContent = "测试连通性";
+      }
+    }
+
+    window.__doTestServerAi = testServerAi;
+    btnTestServerAi?.addEventListener("click", testServerAi);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initAdminConsole);
+  } else {
+    initAdminConsole();
+  }
+  document.addEventListener("astro:page-load", initAdminConsole);
+</script>
+
+<style>
+  .tab-btn {
+    transition: color 0.2s ease, border-color 0.2s ease;
+    background-color: transparent !important;
+  }
+
+  .tab-panel {
+    will-change: opacity, transform;
+  }
+
+  .tab-pane-animate {
+    animation: tabFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes tabFadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes cardSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .member-card-enter {
+    animation: cardSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+</style>
