@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify";
+
 
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -25,11 +25,17 @@ function assertPublicHttpUrl(value) {
   return parsed;
 }
 
+export function sanitizeHtml(html) {
+  if (!html || typeof html !== "string") return "";
+  let clean = html.replace(/<(script|style|iframe|object|embed|form|input|button)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, "");
+  clean = clean.replace(/<(script|style|iframe|object|embed|form|input|button)\b[^>]*\/?>/gi, "");
+  clean = clean.replace(/\s+on\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, "");
+  clean = clean.replace(/\s+(href|src)\s*=\s*['"]\s*(?:javascript|data|vbscript):[^'"]*['"]/gi, "");
+  return clean;
+}
+
 function sanitizeShownotes(html) {
-  return DOMPurify.sanitize(String(html || ""), {
-    ALLOWED_TAGS: ["p", "br", "b", "i", "em", "strong", "a", "ul", "ol", "li"],
-    ALLOWED_ATTR: ["href", "target", "rel"],
-  });
+  return sanitizeHtml(html);
 }
 
 /**

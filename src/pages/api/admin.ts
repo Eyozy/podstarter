@@ -2,7 +2,6 @@ import type { APIRoute } from "astro";
 import fs from "node:fs";
 import path from "node:path";
 import Parser from "rss-parser";
-import DOMPurify from "isomorphic-dompurify";
 import { convertTranscript } from "../../../scripts/convertTranscript.js";
 import { resetData } from "../../../scripts/resetData.js";
 import { askAI } from "../../../scripts/aiClient.js";
@@ -20,7 +19,7 @@ import {
 import { loadSiteConfig, writeOverrides, deepMerge } from "../../../scripts/siteConfig.js";
 import { atomicWriteFile, atomicWriteJson } from "../../../scripts/utils.js";
 import { getProviderEnvPrefix } from "../../../scripts/aiProviderConfig.js";
-import { resolvePodcastInput } from "../../utils/resolver";
+import { resolvePodcastInput, sanitizeHtml } from "../../utils/resolver.js";
 
 export const prerender = false;
 
@@ -74,14 +73,7 @@ export function isPublicHttpUrl(value: string): boolean {
 }
 
 function sanitizeEpisodeContent(html: string): string {
-  return DOMPurify.sanitize(String(html || ""), {
-    ALLOWED_TAGS: [
-      "p", "br", "strong", "em", "a", "ul", "ol", "li",
-      "h2", "h3", "img", "figure", "figcaption", "blockquote",
-    ],
-    ALLOWED_ATTR: ["href", "src", "alt", "class"],
-    ALLOW_DATA_ATTR: false,
-  });
+  return sanitizeHtml(html);
 }
 
 function transcriptFileFor(id: string): string | null {
