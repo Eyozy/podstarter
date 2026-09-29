@@ -6,7 +6,7 @@ import DOMPurify from "isomorphic-dompurify";
 import { convertTranscript } from "../../../scripts/convertTranscript.js";
 import { resetData } from "../../../scripts/resetData.js";
 import { askAI } from "../../../scripts/aiClient.js";
-import type { Episode } from "../../types";
+import type { Episode, ResolvedPodcastResult } from "../../types";
 import {
   ADMIN_COOKIE_NAME,
   ADMIN_SESSION_TTL_MS,
@@ -371,7 +371,7 @@ ${summaries.slice(0, 2000)}`;
         );
       }
 
-      let resolved;
+      let resolved: ResolvedPodcastResult;
       try {
         resolved = await resolvePodcastInput(rawInput);
       } catch (err: unknown) {

@@ -3,7 +3,36 @@ import MainLayout from "../layouts/MainLayout.astro";
 import { loadSiteConfig } from "../../scripts/siteConfig.js";
 const site = loadSiteConfig();
 
-const { about } = site;
+interface MemberLink {
+  label: string;
+  url: string;
+}
+
+interface Member {
+  name: string;
+  role?: string;
+  links: MemberLink[];
+}
+
+const about = site.about as {
+  title: string;
+  tagline: string;
+  intro: string;
+  membersTitle: string;
+  members: Member[];
+  contact: {
+    title: string;
+    description: string;
+    email: string;
+  };
+  feedback: {
+    title: string;
+    description: string;
+    formUrl?: string;
+    formButtonText?: string;
+    channels?: Array<{ name: string; url: string; note?: string }>;
+  };
+};
 const memberGridClasses: Record<number, string> = {
   1: "max-w-md mx-auto grid-cols-1",
   2: "grid-cols-1 sm:grid-cols-2",

@@ -67,10 +67,16 @@ export function writeOverrides(fullConfig) {
 
 export function getRssUrl() {
   const config = loadSiteConfig();
-  if (!config?.podcast?.rssUrl) {
-    throw new Error("Missing podcast.rssUrl in site config.");
+  const candidate =
+    config?.podcast?.rssUrl ||
+    config?.podcast?.neteaseUrl ||
+    config?.podcast?.xiaoyuzhouUrl ||
+    config?.podcast?.appleUrl ||
+    config?.podcast?.ximalayaUrl;
+  if (!candidate) {
+    throw new Error("Missing podcast.rssUrl (or neteaseUrl/xiaoyuzhouUrl/appleUrl) in site config.");
   }
-  return config.podcast.rssUrl;
+  return candidate;
 }
 
 export function normalizeSiteUrl(url) {

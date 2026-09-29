@@ -1,7 +1,6 @@
 ---
 import MainLayout from "../../layouts/MainLayout.astro";
 import { publishedEpisodes, formatEpisodeDate, extractEpisodeNumber } from "../../utils/episodes";
-import { getEntry } from "astro:content";
 import DOMPurify from "isomorphic-dompurify";
 import { loadSiteConfig } from "../../../scripts/siteConfig.js";
 const site = loadSiteConfig();
@@ -28,7 +27,7 @@ const episodeNumber = extractEpisodeNumber(episode, site.ui.episodeNumberFallbac
 const episodeNumberLabel = `${site.ui.episodeNumberPrefix} ${episodeNumber}`;
 const transcriptsEnabled = site.features?.transcripts === true;
 
-let transcript;
+let transcript: { id: string; body: string; data: { contributors?: string[] } } | undefined;
 let transcriptHtml = "";
 let isTranscriptPlaceholder = false;
 if (transcriptsEnabled) {

@@ -26,9 +26,9 @@ interface NavItem {
 
 const isThemesEnabled = site.features?.themes === true;
 const showAdminNav = import.meta.env.DEV || site.features?.showAdminNav === true;
-const filteredNavigation: NavItem[] = (site.navigation || [])
-  .filter((item) => item.href !== "/themes" || isThemesEnabled)
-  .filter((item) => item.href !== "/admin" || showAdminNav);
+const filteredNavigation: NavItem[] = ((site.navigation || []) as NavItem[])
+  .filter((item: NavItem) => item.href !== "/themes" || isThemesEnabled)
+  .filter((item: NavItem) => item.href !== "/admin" || showAdminNav);
 ---
 
 <!doctype html>

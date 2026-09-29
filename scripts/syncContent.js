@@ -18,7 +18,7 @@ import {
   getSupportedProvidersText,
   normalizeProvider,
 } from "./aiProviderConfig.js";
-import { resolvePodcastInput } from "../src/utils/resolver.ts";
+import { resolvePodcastInput } from "../src/utils/resolver.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

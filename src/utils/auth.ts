@@ -34,7 +34,11 @@ export function readEnvMap(): Record<string, string> {
 }
 
 export function resolveAdminPassword(): string {
-  return String(process.env.ADMIN_PASSWORD || readEnvMap().ADMIN_PASSWORD || "").trim();
+  let pass = String(process.env.ADMIN_PASSWORD || readEnvMap().ADMIN_PASSWORD || "").trim();
+  if ((pass.startsWith('"') && pass.endsWith('"')) || (pass.startsWith("'") && pass.endsWith("'"))) {
+    pass = pass.slice(1, -1).trim();
+  }
+  return pass;
 }
 
 function safeEqual(a: string, b: string): boolean {
