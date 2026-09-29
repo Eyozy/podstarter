@@ -26,6 +26,9 @@ pnpm-debug.log*
 # RSS cache
 .last-rss-url
 
+# runtime play counters (written by /api/play at request time)
+src/data/play-counts.json
+
 # macOS-specific files
 .DS_Store
 
