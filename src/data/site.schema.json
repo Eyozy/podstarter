@@ -3,24 +3,34 @@
   "title": "Podcast Site Config",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "brand",
-    "assets",
-    "podcast",
-    "navigation",
-    "hero",
-    "sections",
-    "ui",
-    "pages",
-    "about",
-    "footer",
-    "player",
-    "shareCard",
-    "transcripts"
-  ],
   "properties": {
     "$schema": {
       "type": "string"
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "showcase",
+            "podcast"
+          ],
+          "default": "showcase"
+        }
+      }
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "showcase",
+        "podcast"
+      ],
+      "default": "showcase"
     },
     "features": {
       "type": "object",
@@ -31,26 +41,48 @@
           "type": "boolean",
           "default": false,
           "description": "是否启用 AI 标签/主题功能。启用后需配置环境变量中的 AI 提供商。"
+        },
+        "transcripts": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用文字稿功能。启用后会生成文字稿模板，并在前台展示文字稿相关入口。"
+        },
+        "themes": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用主题分类功能。开启后可在前台展示探索主题页。"
         }
       }
     },
     "brand": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "establishedYear", "meta"],
       "properties": {
-        "name": { "type": "string" },
-        "establishedYear": { "type": "integer" },
+        "name": {
+          "type": "string"
+        },
+        "establishedYear": {
+          "type": "integer"
+        },
         "meta": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["description", "keywords", "author", "twitter", "ogDescription"],
           "properties": {
-            "description": { "type": "string" },
-            "keywords": { "type": "string" },
-            "author": { "type": "string" },
-            "twitter": { "type": "string" },
-            "ogDescription": { "type": "string" }
+            "description": {
+              "type": "string"
+            },
+            "keywords": {
+              "type": "string"
+            },
+            "author": {
+              "type": "string"
+            },
+            "twitter": {
+              "type": "string"
+            },
+            "ogDescription": {
+              "type": "string"
+            }
           }
         }
       }
@@ -58,29 +90,46 @@
     "assets": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["defaultCover", "ogImage", "favicon"],
       "properties": {
-        "defaultCover": { "type": "string" },
-        "ogImage": { "type": "string" },
-        "favicon": { "type": "string" }
+        "defaultCover": {
+          "type": "string"
+        },
+        "ogImage": {
+          "type": "string"
+        },
+        "favicon": {
+          "type": "string"
+        }
       }
     },
     "podcast": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "rssUrl",
-        "appleUrl",
-        "xiaoyuzhouUrl",
-        "xiaoyuzhouQr",
-        "wechatQr"
-      ],
       "properties": {
-        "rssUrl": { "type": "string" },
-        "appleUrl": { "type": "string" },
-        "xiaoyuzhouUrl": { "type": "string" },
-        "xiaoyuzhouQr": { "type": "string" },
-        "wechatQr": { "type": "string" }
+        "rssUrl": {
+          "type": "string"
+        },
+        "appleUrl": {
+          "type": "string"
+        },
+        "xiaoyuzhouUrl": {
+          "type": "string"
+        },
+        "xiaoyuzhouQr": {
+          "type": "string"
+        },
+        "wechatQr": {
+          "type": "string"
+        },
+        "spotifyUrl": {
+          "type": "string"
+        },
+        "ximalayaUrl": {
+          "type": "string"
+        },
+        "neteaseUrl": {
+          "type": "string"
+        }
       }
     },
     "navigation": {
@@ -88,36 +137,48 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["label", "href"],
         "properties": {
-          "label": { "type": "string" },
-          "href": { "type": "string" }
+          "label": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          }
         }
       }
     },
     "hero": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["titlePrefix", "titleHighlight", "titleSuffix", "description", "cta"],
       "properties": {
-        "titlePrefix": { "type": "string" },
-        "titleHighlight": { "type": "string" },
-        "titleSuffix": { "type": "string" },
-        "description": { "type": "string" },
+        "titlePrefix": {
+          "type": "string"
+        },
+        "titleHighlight": {
+          "type": "string"
+        },
+        "titleSuffix": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
         "cta": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "listenLatestLabel",
-            "browseAllDesktopLabel",
-            "browseAllMobileLabel",
-            "learnMoreLabel"
-          ],
           "properties": {
-            "listenLatestLabel": { "type": "string" },
-            "browseAllDesktopLabel": { "type": "string" },
-            "browseAllMobileLabel": { "type": "string" },
-            "learnMoreLabel": { "type": "string" }
+            "listenLatestLabel": {
+              "type": "string"
+            },
+            "browseAllDesktopLabel": {
+              "type": "string"
+            },
+            "browseAllMobileLabel": {
+              "type": "string"
+            },
+            "learnMoreLabel": {
+              "type": "string"
+            }
           }
         }
       }
@@ -125,30 +186,42 @@
     "sections": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "recentTitle",
-        "recentBrowseAllLabel",
-        "themesTitle",
-        "rssTitle",
-        "rssDescription",
-        "rssLabels"
-      ],
       "properties": {
-        "recentSubtitle": { "type": "string", "description": "首页近期更新区块的英文副标题（如 Recent）" },
-        "recentTitle": { "type": "string" },
-        "recentBrowseAllLabel": { "type": "string" },
-        "themesTitle": { "type": "string" },
-        "rssTitle": { "type": "string" },
-        "rssDescription": { "type": "string" },
+        "recentSubtitle": {
+          "type": "string",
+          "description": "首页近期更新区块的英文副标题（如 Recent）"
+        },
+        "recentTitle": {
+          "type": "string"
+        },
+        "recentBrowseAllLabel": {
+          "type": "string"
+        },
+        "themesTitle": {
+          "type": "string"
+        },
+        "rssTitle": {
+          "type": "string"
+        },
+        "rssDescription": {
+          "type": "string"
+        },
         "rssLabels": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["apple", "rss", "xiaoyuzhou", "wechat"],
           "properties": {
-            "apple": { "type": "string" },
-            "rss": { "type": "string" },
-            "xiaoyuzhou": { "type": "string" },
-            "wechat": { "type": "string" }
+            "apple": {
+              "type": "string"
+            },
+            "rss": {
+              "type": "string"
+            },
+            "xiaoyuzhou": {
+              "type": "string"
+            },
+            "wechat": {
+              "type": "string"
+            }
           }
         }
       }
@@ -156,146 +229,191 @@
     "ui": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "openMenuLabel",
-        "closeMenuLabel",
-        "backToTopLabel",
-        "playLabel",
-        "pauseLabel",
-        "playEpisodeAriaLabel",
-        "playLatestAriaLabel",
-        "downloadLabel",
-        "shareLabel",
-        "detailLabel",
-        "closeLabel",
-        "unknownDurationLabel",
-        "unknownSizeLabel",
-        "episodeNumberPrefix",
-        "episodeNumberFallbackLabel"
-      ],
       "properties": {
-        "openMenuLabel": { "type": "string" },
-        "closeMenuLabel": { "type": "string" },
-        "backToTopLabel": { "type": "string" },
-        "playLabel": { "type": "string" },
-        "pauseLabel": { "type": "string" },
-        "playEpisodeAriaLabel": { "type": "string" },
-        "playLatestAriaLabel": { "type": "string" },
-        "downloadLabel": { "type": "string" },
-        "shareLabel": { "type": "string" },
-        "detailLabel": { "type": "string" },
-        "closeLabel": { "type": "string" },
-        "unknownDurationLabel": { "type": "string" },
-        "unknownSizeLabel": { "type": "string" },
-        "episodeNumberPrefix": { "type": "string" },
-        "episodeNumberFallbackLabel": { "type": "string" }
+        "openMenuLabel": {
+          "type": "string"
+        },
+        "closeMenuLabel": {
+          "type": "string"
+        },
+        "backToTopLabel": {
+          "type": "string"
+        },
+        "playLabel": {
+          "type": "string"
+        },
+        "pauseLabel": {
+          "type": "string"
+        },
+        "playEpisodeAriaLabel": {
+          "type": "string"
+        },
+        "playLatestAriaLabel": {
+          "type": "string"
+        },
+        "downloadLabel": {
+          "type": "string"
+        },
+        "shareLabel": {
+          "type": "string"
+        },
+        "detailLabel": {
+          "type": "string"
+        },
+        "closeLabel": {
+          "type": "string"
+        },
+        "unknownDurationLabel": {
+          "type": "string"
+        },
+        "unknownSizeLabel": {
+          "type": "string"
+        },
+        "episodeNumberPrefix": {
+          "type": "string"
+        },
+        "episodeNumberFallbackLabel": {
+          "type": "string"
+        }
       }
     },
     "pages": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["home", "episodes", "themes", "about", "episodeDetail"],
       "properties": {
         "home": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["title"],
           "properties": {
-            "title": { "type": "string" }
+            "title": {
+              "type": "string"
+            }
           }
         },
         "episodes": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "title",
-            "headline",
-            "description",
-            "activeThemeLabel",
-            "clearThemeTitle",
-            "searchLabel",
-            "searchPlaceholder",
-            "searchClearTitle",
-            "searchCountPrefix",
-            "searchCountSuffix",
-            "yearFilterTitle",
-            "allYearsLabel",
-            "tagFilterTitle",
-            "clearTagLabel",
-            "toggleTagsExpandLabel",
-            "toggleTagsCollapseLabel",
-            "emptyTitle",
-            "emptySubtitle"
-          ],
           "properties": {
-            "title": { "type": "string" },
-            "headline": { "type": "string" },
-            "description": { "type": "string" },
-            "activeThemeLabel": { "type": "string" },
-            "clearThemeTitle": { "type": "string" },
-            "searchLabel": { "type": "string" },
-            "searchPlaceholder": { "type": "string" },
-            "searchClearTitle": { "type": "string" },
-            "searchCountPrefix": { "type": "string" },
-            "searchCountSuffix": { "type": "string" },
-            "yearFilterTitle": { "type": "string" },
-            "allYearsLabel": { "type": "string" },
-            "tagFilterTitle": { "type": "string" },
-            "clearTagLabel": { "type": "string" },
-            "toggleTagsExpandLabel": { "type": "string" },
-            "toggleTagsCollapseLabel": { "type": "string" },
-            "emptyTitle": { "type": "string" },
-            "emptySubtitle": { "type": "string" }
+            "title": {
+              "type": "string"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "activeThemeLabel": {
+              "type": "string"
+            },
+            "clearThemeTitle": {
+              "type": "string"
+            },
+            "searchLabel": {
+              "type": "string"
+            },
+            "searchPlaceholder": {
+              "type": "string"
+            },
+            "searchClearTitle": {
+              "type": "string"
+            },
+            "searchCountPrefix": {
+              "type": "string"
+            },
+            "searchCountSuffix": {
+              "type": "string"
+            },
+            "yearFilterTitle": {
+              "type": "string"
+            },
+            "allYearsLabel": {
+              "type": "string"
+            },
+            "tagFilterTitle": {
+              "type": "string"
+            },
+            "clearTagLabel": {
+              "type": "string"
+            },
+            "toggleTagsExpandLabel": {
+              "type": "string"
+            },
+            "toggleTagsCollapseLabel": {
+              "type": "string"
+            },
+            "emptyTitle": {
+              "type": "string"
+            },
+            "emptySubtitle": {
+              "type": "string"
+            }
           }
         },
         "themes": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["title", "headline", "emptyLabel"],
           "properties": {
-            "title": { "type": "string" },
-            "headline": { "type": "string" },
-            "emptyLabel": { "type": "string" }
+            "title": {
+              "type": "string"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "emptyLabel": {
+              "type": "string"
+            }
           }
         },
         "about": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["title"],
           "properties": {
-            "title": { "type": "string" }
+            "title": {
+              "type": "string"
+            }
           }
         },
         "episodeDetail": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "breadcrumbListLabel",
-            "breadcrumbCurrentLabel",
-            "playNowLabel",
-            "downloadTranscriptTitle",
-            "downloadTranscriptLabel",
-            "downloadMetaDateLabel",
-            "downloadMetaAudioLabel",
-            "infoTabLabel",
-            "transcriptTabLabel",
-            "transcriptEmptyTitle",
-            "transcriptContributorsLabel",
-            "transcriptNewBadgeLabel"
-          ],
           "properties": {
-            "breadcrumbListLabel": { "type": "string" },
-            "breadcrumbCurrentLabel": { "type": "string" },
-            "playNowLabel": { "type": "string" },
-            "downloadTranscriptTitle": { "type": "string" },
-            "downloadTranscriptLabel": { "type": "string" },
-            "downloadMetaDateLabel": { "type": "string" },
-            "downloadMetaAudioLabel": { "type": "string" },
-            "infoTabLabel": { "type": "string" },
-            "transcriptTabLabel": { "type": "string" },
-            "transcriptEmptyTitle": { "type": "string" },
-            "transcriptContributorsLabel": { "type": "string" },
-            "transcriptNewBadgeLabel": { "type": "string" }
+            "breadcrumbListLabel": {
+              "type": "string"
+            },
+            "breadcrumbCurrentLabel": {
+              "type": "string"
+            },
+            "playNowLabel": {
+              "type": "string"
+            },
+            "downloadTranscriptTitle": {
+              "type": "string"
+            },
+            "downloadTranscriptLabel": {
+              "type": "string"
+            },
+            "downloadMetaDateLabel": {
+              "type": "string"
+            },
+            "downloadMetaAudioLabel": {
+              "type": "string"
+            },
+            "infoTabLabel": {
+              "type": "string"
+            },
+            "transcriptTabLabel": {
+              "type": "string"
+            },
+            "transcriptEmptyTitle": {
+              "type": "string"
+            },
+            "transcriptContributorsLabel": {
+              "type": "string"
+            },
+            "transcriptNewBadgeLabel": {
+              "type": "string"
+            }
           }
         }
       }
@@ -303,37 +421,46 @@
     "about": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "title",
-        "tagline",
-        "intro",
-        "membersTitle",
-        "members",
-        "contact",
-        "feedback"
-      ],
       "properties": {
-        "title": { "type": "string" },
-        "tagline": { "type": "string" },
-        "intro": { "type": "string" },
-        "membersTitle": { "type": "string" },
+        "title": {
+          "type": "string"
+        },
+        "tagline": {
+          "type": "string"
+        },
+        "intro": {
+          "type": "string"
+        },
+        "membersTitle": {
+          "type": "string"
+        },
         "members": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "links"],
             "properties": {
-              "name": { "type": "string" },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "avatar": {
+                "type": "string"
+              },
               "links": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["label", "url"],
                   "properties": {
-                    "label": { "type": "string" },
-                    "url": { "type": "string" }
+                    "label": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -343,32 +470,49 @@
         "contact": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["title", "description", "email"],
           "properties": {
-            "title": { "type": "string" },
-            "description": { "type": "string" },
-            "email": { "type": "string" }
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
           }
         },
         "feedback": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["title", "description", "channels"],
           "properties": {
-            "title": { "type": "string" },
-            "description": { "type": "string" },
-            "formUrl": { "type": "string" },
-            "formButtonText": { "type": "string" },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "formUrl": {
+              "type": "string"
+            },
+            "formButtonText": {
+              "type": "string"
+            },
             "channels": {
               "type": "array",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["title", "label", "url"],
                 "properties": {
-                  "title": { "type": "string" },
-                  "label": { "type": "string" },
-                  "url": { "type": "string" }
+                  "title": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -379,72 +523,91 @@
     "footer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["descriptionLine1", "descriptionLine2"],
       "properties": {
-        "descriptionLine1": { "type": "string" },
-        "descriptionLine2": { "type": "string" }
+        "descriptionLine1": {
+          "type": "string"
+        },
+        "descriptionLine2": {
+          "type": "string"
+        }
       }
     },
     "player": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "notPlayingLabel",
-        "nowPlayingLabel",
-        "expandLabel",
-        "minimizeLabel",
-        "minimizeAriaLabel",
-        "closeLabel",
-        "closeAriaLabel",
-        "prevLabel",
-        "nextLabel",
-        "backwardLabel",
-        "forwardLabel",
-        "playAriaLabel",
-        "pauseAriaLabel"
-      ],
       "properties": {
-        "notPlayingLabel": { "type": "string" },
-        "nowPlayingLabel": { "type": "string" },
-        "expandLabel": { "type": "string" },
-        "minimizeLabel": { "type": "string" },
-        "minimizeAriaLabel": { "type": "string" },
-        "closeLabel": { "type": "string" },
-        "closeAriaLabel": { "type": "string" },
-        "prevLabel": { "type": "string" },
-        "nextLabel": { "type": "string" },
-        "backwardLabel": { "type": "string" },
-        "forwardLabel": { "type": "string" },
-        "playAriaLabel": { "type": "string" },
-        "pauseAriaLabel": { "type": "string" }
+        "notPlayingLabel": {
+          "type": "string"
+        },
+        "nowPlayingLabel": {
+          "type": "string"
+        },
+        "expandLabel": {
+          "type": "string"
+        },
+        "minimizeLabel": {
+          "type": "string"
+        },
+        "minimizeAriaLabel": {
+          "type": "string"
+        },
+        "closeLabel": {
+          "type": "string"
+        },
+        "closeAriaLabel": {
+          "type": "string"
+        },
+        "prevLabel": {
+          "type": "string"
+        },
+        "nextLabel": {
+          "type": "string"
+        },
+        "backwardLabel": {
+          "type": "string"
+        },
+        "forwardLabel": {
+          "type": "string"
+        },
+        "playAriaLabel": {
+          "type": "string"
+        },
+        "pauseAriaLabel": {
+          "type": "string"
+        }
       }
     },
     "shareCard": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "title",
-        "downloadLabel",
-        "qrLabel",
-        "generatingLabel",
-        "generateErrorMessage",
-        "filenamePrefix"
-      ],
       "properties": {
-        "title": { "type": "string" },
-        "downloadLabel": { "type": "string" },
-        "qrLabel": { "type": "string" },
-        "generatingLabel": { "type": "string" },
-        "generateErrorMessage": { "type": "string" },
-        "filenamePrefix": { "type": "string" }
+        "title": {
+          "type": "string"
+        },
+        "downloadLabel": {
+          "type": "string"
+        },
+        "qrLabel": {
+          "type": "string"
+        },
+        "generatingLabel": {
+          "type": "string"
+        },
+        "generateErrorMessage": {
+          "type": "string"
+        },
+        "filenamePrefix": {
+          "type": "string"
+        }
       }
     },
     "transcripts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["placeholderNotice"],
       "properties": {
-        "placeholderNotice": { "type": "string" }
+        "placeholderNotice": {
+          "type": "string"
+        }
       }
     }
   }
