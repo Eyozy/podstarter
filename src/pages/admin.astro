@@ -93,19 +93,32 @@ try {
   isFsWritable = false;
 }
 
-let currentCommitSha = String(process.env.COMMIT_REF || process.env.COMMIT_SHA || "").trim();
+let currentCommitSha = String(process.env.COMMIT_REF || process.env.COMMIT_SHA || "").trim().slice(0, 7);
 let localCommitList: string[] = [];
+
 try {
-  const { execSync } = await import("node:child_process");
-  localCommitList = execSync("git log -n 50 --format=%h", { encoding: "utf-8" })
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!currentCommitSha && localCommitList.length > 0) {
-    currentCommitSha = localCommitList[0];
+  const gitMetaPath = path.join(process.cwd(), "src/data/gitMeta.json");
+  if (fs.existsSync(gitMetaPath)) {
+    const meta = JSON.parse(fs.readFileSync(gitMetaPath, "utf-8"));
+    localCommitList = Array.isArray(meta.commits) ? meta.commits : [];
+    if (!currentCommitSha && meta.currentSha) currentCommitSha = String(meta.currentSha).slice(0, 7);
   }
 } catch {
   localCommitList = [];
+}
+
+if (!currentCommitSha || localCommitList.length === 0) {
+  try {
+    const { execSync } = await import("node:child_process");
+    const shas = execSync("git log -n 50 --format=%h", { encoding: "utf-8" })
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (shas.length > 0) {
+      if (!currentCommitSha) currentCommitSha = shas[0];
+      if (localCommitList.length === 0) localCommitList = shas;
+    }
+  } catch {}
 }
 const shortCommitSha = currentCommitSha.slice(0, 7);
 const currentVersion = "1.1.0";

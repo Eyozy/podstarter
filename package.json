@@ -4,6 +4,7 @@
   "version": "1.1.0",
   "scripts": {
     "dev": "NODE_OPTIONS='--no-network-family-autoselection' astro dev",
+    "prebuild": "node scripts/generateGitMeta.js",
     "build": "astro build && npx pagefind --site dist",
     "astro": "astro",
     "sync": "NODE_OPTIONS='--no-network-family-autoselection' node scripts/syncContent.js",
